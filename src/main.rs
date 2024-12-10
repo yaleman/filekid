@@ -2,16 +2,21 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use clap::Parser;
+use filekid::cli::CliOpts;
+use filekid::error::Error;
 use filekid::log::setup_logging;
 use filekid::web::run_web_server;
 use tokio::sync::RwLock;
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
-    let config = filekid::Config::from_file("filekid.json")?;
-    config.startup_check()?;
+async fn main() -> Result<(), filekid::error::Error> {
+    let cli = CliOpts::parse();
 
-    setup_logging(true, true).map_err(|err| err.to_string())?;
+    setup_logging(cli.debug, true).map_err(|err| Error::Generic(err.to_string()))?;
+
+    let config = filekid::Config::new(cli)?;
+    config.startup_check()?;
 
     let (web_tx, web_rx) = tokio::sync::mpsc::channel(1);
     println!("Listening on {}", config.frontend_url.clone());
@@ -24,7 +29,4 @@ async fn main() -> Result<(), String> {
         web_rx,
     )
     .await
-    .map_err(|err| format!("{:?}", err))?;
-
-    Ok(())
 }

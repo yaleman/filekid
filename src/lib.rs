@@ -14,7 +14,10 @@
 #![deny(clippy::unwrap_used)]
 #![forbid(unsafe_code)]
 
+pub mod cli;
 pub mod constants;
+pub mod error;
+pub mod fs;
 pub mod log;
 pub mod oidc;
 pub(crate) mod prelude;
@@ -27,8 +30,9 @@ use std::num::NonZeroU16;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use askama_axum::IntoResponse;
-use axum::http::StatusCode;
+use cli::CliOpts;
+use error::Error;
+use fs::FileKidFsType;
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
@@ -41,7 +45,7 @@ fn bind_address_default() -> IpAddr {
 
 type SendableConfig = Arc<RwLock<Config>>;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize)]
 /// Configuration for the FileKid server.
 pub struct Config {
     #[serde(default = "bind_address_default")]
@@ -70,23 +74,41 @@ pub struct Config {
     pub cert_key: PathBuf,
     /// Where to find the thing
     pub frontend_url: String,
+
+    /// Debug mode is on
+    #[serde(default)]
+    pub debug: bool,
 }
 
 impl Config {
+    pub fn new(cli: CliOpts) -> Result<Self, Error> {
+        let config_filename = cli.config.unwrap_or(PathBuf::from("filekid.json"));
+
+        let mut config = Self::from_file(&config_filename)?;
+
+        if cli.debug {
+            config.debug = true
+        }
+        Ok(config)
+    }
+
     /// Load the configuration from a file.
-    pub fn from_file(filename: &str) -> Result<Self, String> {
-        let config = std::fs::read_to_string(filename).map_err(|e| e.to_string())?;
-        serde_json::from_str(&config).map_err(|e| format!("Failed to parse config: {:?}", e))
+    pub fn from_file(filename: &PathBuf) -> Result<Self, Error> {
+        let config = std::fs::read_to_string(filename)?;
+        serde_json::from_str(&config).map_err(|e| {
+            eprintln!("Failed to parse config: {:?}", e);
+            Error::Configuration(e.to_string())
+        })
     }
     /// Check that the configuration is valid.
-    pub fn startup_check(&self) -> Result<(), String> {
+    pub fn startup_check(&self) -> Result<(), Error> {
         for (server, server_config) in self.server_paths.iter() {
             if !server_config.path.exists() {
-                return Err(format!(
+                return Err(Error::NotFound(format!(
                     "Server path {} does not exist: {}",
                     server,
                     server_config.path.display()
-                ));
+                )));
             }
         }
         Ok(())
@@ -102,6 +124,8 @@ impl Config {
 pub struct ServerPath {
     /// The path on disk, can be relative or absolute.
     pub path: PathBuf,
+    #[serde(rename = "type")]
+    pub type_: FileKidFsType,
 }
 
 pub enum WebMessage {
@@ -115,7 +139,7 @@ pub enum WebServerControl {
 }
 
 /// The FileKid server internal state
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct WebState {
     /// The configuration.
     pub configuration: SendableConfig,
@@ -137,39 +161,5 @@ impl WebState {
             web_tx,
             config_filepath,
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    /// Generic error
-    Generic(String),
-    /// A configuration error.
-    Configuration(String),
-    /// An OIDC error.
-    Oidc(String),
-    /// Couldn't find that
-    NotFound(String),
-    /// Internal server error
-    InternalServerError(String),
-    /// IO things went bad
-    Io(std::io::Error),
-}
-
-impl From<axum_oidc::error::Error> for Error {
-    fn from(e: axum_oidc::error::Error) -> Self {
-        Self::Oidc(e.to_string())
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> askama_axum::Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", self)).into_response()
     }
 }

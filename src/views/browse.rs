@@ -2,6 +2,8 @@
 use axum::extract::Path;
 use axum::http::HeaderMap;
 
+use crate::fs::fs_from_serverpath;
+
 use super::prelude::*;
 
 // use crate::{prelude::*, FileKid};
@@ -11,30 +13,24 @@ pub(crate) async fn get_file(
 
     Path((server_path, filepath)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, Error> {
-    let server_path_reader = state.configuration.read().await;
-    let server_path_object = match server_path_reader.server_paths.get(&server_path) {
+    let server_reader = state.configuration.read().await;
+    let server_path_object = match server_reader.server_paths.get(&server_path) {
         None => {
             error!("Couldn't find server path {}", server_path);
             return Err(Error::NotFound(server_path));
         }
         Some(p) => p,
     };
-    let full_path = server_path_object
-        .path
-        .join(&filepath)
-        .canonicalize()
-        .map_err(|e| {
-            Error::Generic(format!(
-                "Failed to canonicalize path: {} - error: {}",
-                server_path_object.path.join(&filepath).display(),
-                e
-            ))
-        })?;
 
-    if !full_path.exists() {
-        return Err(Error::NotFound(full_path.display().to_string()));
+    let filekidfs = fs_from_serverpath(server_path_object)?;
+
+    if !filekidfs.exists(&filepath)? {
+        return Err(Error::NotFound(filepath.to_string()));
     }
-    let mime_type = mime_guess::from_path(&full_path)
+
+    let metadata = filekidfs.get_data(&filepath)?;
+
+    let mime_type = mime_guess::from_path(&filepath)
         .first_or_octet_stream()
         .to_string();
     let mut headers = HeaderMap::new();
@@ -53,19 +49,7 @@ pub(crate) async fn get_file(
             ))
         })?,
     );
-    Ok((
-        StatusCode::OK,
-        headers,
-        std::fs::read(full_path).map_err(|e| {
-            error!(
-                "Failed to read file {} from server {}: {}",
-                server_path_object.path.join(&filepath).display(),
-                server_path,
-                e
-            );
-            Error::from(e)
-        })?,
-    ))
+    Ok((StatusCode::OK, headers, filekidfs.get_file(&metadata)?))
 }
 
 #[derive(Template)]
@@ -77,7 +61,7 @@ pub(crate) struct BrowsePage {
     current_path: String,
 }
 
-pub(crate) enum FileType {
+pub enum FileType {
     Directory,
     File,
 }
@@ -91,10 +75,10 @@ impl FileType {
     }
 }
 
-pub(crate) struct FileEntry {
-    filename: String,
-    fullpath: String,
-    filetype: FileType,
+pub struct FileEntry {
+    pub filename: String,
+    pub fullpath: String,
+    pub filetype: FileType,
 }
 
 impl FileEntry {
@@ -121,7 +105,8 @@ pub(crate) async fn browse(
 ) -> Result<BrowsePage, Error> {
     // let path = path.server_path.clone();
     let server_reader = state.configuration.read().await;
-    let server_filepath = match server_reader.server_paths.get(&server_path) {
+
+    let server_path_object = match server_reader.server_paths.get(&server_path) {
         None => {
             error!("Couldn't find server path {}", server_path);
             return Err(Error::NotFound(server_path));
@@ -129,66 +114,17 @@ pub(crate) async fn browse(
         Some(p) => p,
     };
 
-    // // get the list of files in the path
+    let filekidfs = fs_from_serverpath(server_path_object)?;
 
-    let target_path = server_filepath
-        .path
-        .join(filepath.clone().unwrap_or("".to_string()));
-
-    let entries: Vec<FileEntry> = std::fs::read_dir(&target_path)
-        .map_err(|e| {
-            error!(
-                "Failed to read dir {} from server {}: {}",
-                server_path,
-                target_path.display(),
-                e
-            );
-            Error::from(e)
-        })?
-        .map(|entry| {
-            entry
-                .map_err(|e| {
-                    error!(
-                        "Failed to read dir {} from server {}: {}",
-                        server_path,
-                        target_path.display(),
-                        e
-                    );
-                    Error::from(e)
-                })
-                .and_then(|entry| {
-                    let filename = entry.file_name().into_string().map_err(|e| {
-                        error!(
-                            "Failed to get filename for {:?} from server {}: {:?}",
-                            entry, server_path, e
-                        );
-                        Error::InternalServerError(format!("Invalid Filename {:?} {:?}", entry, e))
-                    })?;
-                    let fullpath = match &filepath {
-                        Some(p) => format!("{}/{}", p, filename),
-                        None => filename.clone(),
-                    };
-
-                    let filetype = entry.file_type().map_err(|e| {
-                        error!(
-                            "Failed to get filetype for {:?} from server {}: {:?}",
-                            entry, server_path, e
-                        );
-                        Error::from(e)
-                    })?;
-
-                    Ok(FileEntry {
-                        filename,
-                        fullpath,
-                        filetype: if filetype.is_dir() {
-                            FileType::Directory
-                        } else {
-                            FileType::File
-                        },
-                    })
-                })
-        })
-        .collect::<Result<Vec<FileEntry>, Error>>()?;
+    if !filekidfs.exists(
+        &filepath
+            .clone()
+            .map(|p| p.trim_start_matches('/').to_string())
+            .clone()
+            .unwrap_or("".into()),
+    )? {
+        return Err(Error::NotFound(filepath.unwrap_or("".into())));
+    }
 
     let parent_path = match &filepath {
         Some(p) => {
@@ -199,6 +135,7 @@ pub(crate) async fn browse(
         None => None,
     };
 
+    let entries: Vec<FileEntry> = filekidfs.list_dir(filepath.clone())?;
     let res = BrowsePage {
         server_path,
         entries,
