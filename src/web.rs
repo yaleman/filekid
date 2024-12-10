@@ -122,19 +122,29 @@ pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
             })?,
         );
 
+    let ui = Router::new()
+        .route("/browse/:server_path/", get(browse_nopath))
+        .route("/browse/:server_path/*filepath", get(browse))
+        .route("/get/:server_path/*filepath", get(get_file))
+        // after here, the routers don't *require* auth
+        .route(Urls::Index.as_ref(), get(views::home));
+
     let app = Router::new()
         .route(
             Urls::Login.as_ref(),
             get(Redirect::temporary(Urls::Index.as_ref())),
         )
-        .route(Urls::RpLogout.as_ref(), get(views::oidc::rp_logout))
-        .layer(oidc_login_service)
-        .route("/browse/:server_path/", get(browse_nopath))
-        .route("/browse/:server_path/*filepath", get(browse))
-        .route("/get/:server_path/*filepath", get(get_file))
-        // after here, the routers don't *require* auth
-        .route(Urls::Index.as_ref(), get(views::home))
-        .layer(oidc_auth_layer)
+        .route(Urls::RpLogout.as_ref(), get(views::oidc::rp_logout));
+
+    let app: Router<WebState> = match state.configuration.read().await.oauth2_disabled {
+        true => app.merge(ui),
+        false => app
+            .merge(ui)
+            .layer(oidc_login_service)
+            .layer(oidc_auth_layer),
+    };
+
+    let app = app
         // after here, the URLs cannot have auth
         .route(Urls::HealthCheck.as_ref(), get(up))
         .route(Urls::Logout.as_ref(), get(views::oidc::logout))

@@ -78,6 +78,10 @@ pub struct Config {
     /// Debug mode is on
     #[serde(default)]
     pub debug: bool,
+
+    // Testing-only option to disable OAuth2
+    #[serde(default)]
+    oauth2_disabled: bool,
 }
 
 impl Config {
@@ -89,6 +93,11 @@ impl Config {
         if cli.debug {
             config.debug = true
         }
+        #[cfg(any(debug_assertions, test))]
+        if cli.oauth2_disable {
+            config.oauth2_disabled = true
+        }
+
         Ok(config)
     }
 
