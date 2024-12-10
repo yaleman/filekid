@@ -1,45 +1,30 @@
-use dropshot::ApiDescription;
-use dropshot::ConfigDropshot;
-use dropshot::ConfigLogging;
-use dropshot::ConfigLoggingLevel;
-use dropshot::ServerBuilder;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use filekid::log::setup_logging;
+use filekid::web::run_web_server;
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    // Set up a logger.
-    let log = ConfigLogging::StderrTerminal {
-        level: ConfigLoggingLevel::Info,
-    }
-    .to_logger("minimal-example")
-    .map_err(|e| e.to_string())?;
-
     let config = filekid::Config::from_file("filekid.json")?;
     config.startup_check()?;
 
-    let filekid = filekid::FileKid {
-        config: config.clone(),
-    };
+    setup_logging(true, true).map_err(|err| err.to_string())?;
 
-    // Describe the API.
-    let mut api = ApiDescription::new();
-    // Register API functions -- see detailed example or ApiDescription docs.
-    api.register(filekid::views::home)
-        .map_err(|e| e.to_string())?;
-    api.register(filekid::views::browse::get_file)
-        .map_err(|e| e.to_string())?;
-    // api.register(filekid::views::browse::browse)
-    //     .map_err(|e| e.to_string())?;
+    let (web_tx, web_rx) = tokio::sync::mpsc::channel(1);
+    println!("Listening on {}", config.frontend_url.clone());
+    let sendable_config = Arc::new(RwLock::new(config));
 
-    // Start the server.
-    let server = ServerBuilder::new(api, filekid, log)
-        .config(ConfigDropshot {
-            bind_address: config.bind_address,
-            default_request_body_max_bytes: 10240,
-            default_handler_task_mode: dropshot::HandlerTaskMode::CancelOnDisconnect,
-            log_headers: Vec::new(),
-        })
-        .start()
-        .map_err(|error| format!("failed to start server: {}", error))?;
-    println!("Listening on http://{}", config.bind_address);
-    server.await
+    run_web_server(
+        PathBuf::from_str("filekid.json").expect("Failed to parse filekid.json"),
+        sendable_config,
+        web_tx,
+        web_rx,
+    )
+    .await
+    .map_err(|err| format!("{:?}", err))?;
+
+    Ok(())
 }

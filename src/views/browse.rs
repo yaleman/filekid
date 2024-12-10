@@ -1,128 +1,209 @@
 //! This module contains the browse endpoint, which allows users to browse the files on the server.
+use axum::extract::Path;
+use axum::http::HeaderMap;
 
-use dropshot::{Body, Path};
+use super::prelude::*;
 
-use crate::{prelude::*, FileKid};
+// use crate::{prelude::*, FileKid};
 
-#[derive(Deserialize, JsonSchema, Clone)]
-/// The path to browse.
-pub struct GetPath {
-    /// The server path.
-    pub server_path: String,
-    /// The file path.
-    pub filepath: Vec<String>,
-}
+pub(crate) async fn get_file(
+    State(state): State<WebState>,
 
-#[endpoint {
-    method = GET,
-    path = r#"/browse/{server_path}/{filepath:.*}"#,
-    unpublished = true
-}]
-pub async fn get_file(
-    rqctx: RequestContext<FileKid>,
-    path: Path<GetPath>,
-) -> Result<Response<Body>, HttpError> {
-    let path = path.into_inner();
-
-    if path.filepath.is_empty() {
-        return browse(rqctx, path).await;
-    }
-
-    let server_config = match rqctx.context().config.server_paths.get(&path.server_path) {
+    Path((server_path, filepath)): Path<(String, String)>,
+) -> Result<impl IntoResponse, Error> {
+    let server_path_reader = state.configuration.read().await;
+    let server_path_object = match server_path_reader.server_paths.get(&server_path) {
         None => {
-            return Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::empty())?);
+            error!("Couldn't find server path {}", server_path);
+            return Err(Error::NotFound(server_path));
         }
         Some(p) => p,
     };
-
-    let full_path = server_config
+    let full_path = server_path_object
         .path
-        .join(path.filepath.clone().join("/"))
+        .join(&filepath)
         .canonicalize()
         .map_err(|e| {
-            HttpError::for_internal_error(format!(
-                "Failed to canonicalize path: {:?} - {}",
-                path.filepath, e
+            Error::Generic(format!(
+                "Failed to canonicalize path: {} - error: {}",
+                server_path_object.path.join(&filepath).display(),
+                e
             ))
         })?;
 
-    if !full_path.starts_with(&server_config.path.canonicalize().map_err(|e| {
-        HttpError::for_internal_error(format!(
-            "Failed to canonicalize path: {:?} - {}",
-            path.filepath, e
-        ))
-    })?) {
-        return Ok(Response::builder()
-            .status(StatusCode::FORBIDDEN)
-            .body(Body::empty())?);
+    if !full_path.exists() {
+        return Err(Error::NotFound(full_path.display().to_string()));
     }
-
-    let file =
-        std::fs::read(&full_path).map_err(|e| HttpError::for_internal_error(e.to_string()))?;
-
-    // guess the content-type based on the filename
-    let content_type = mime_guess::from_path(&full_path)
+    let mime_type = mime_guess::from_path(&full_path)
         .first_or_octet_stream()
         .to_string();
-
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(http::header::CONTENT_TYPE, content_type)
-        // .header(
-        //     http::header::CONTENT_DISPOSITION,
-        //     format!(
-        //         "attachment; filename={}",
-        //         full_path.file_name().unwrap().to_string_lossy()
-        //     ),
-        // )
-        .body(file.into())?)
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Content-Type",
+        mime_type.parse().map_err(|err| {
+            error!(
+                "Failed to parse mime type for file {}: {}",
+                server_path_object.path.join(&filepath).display(),
+                err
+            );
+            Error::InternalServerError(format!(
+                "Failed to parse mime type for file {}: {}",
+                server_path_object.path.join(&filepath).display(),
+                err
+            ))
+        })?,
+    );
+    Ok((
+        StatusCode::OK,
+        headers,
+        std::fs::read(full_path).map_err(|e| {
+            error!(
+                "Failed to read file {} from server {}: {}",
+                server_path_object.path.join(&filepath).display(),
+                server_path,
+                e
+            );
+            Error::from(e)
+        })?,
+    ))
 }
 
-/// Browse the files in a server path.
-pub async fn browse(
-    rqctx: RequestContext<FileKid>,
-    path: GetPath,
-) -> Result<Response<Body>, HttpError> {
-    let path = path.server_path.clone();
-    let filepath = match rqctx.context().config.server_paths.get(&path) {
+#[derive(Template)]
+#[template(path = "browse.html")]
+pub(crate) struct BrowsePage {
+    server_path: String,
+    entries: Vec<FileEntry>,
+    parent_path: Option<String>,
+    current_path: String,
+}
+
+pub(crate) enum FileType {
+    Directory,
+    File,
+}
+
+impl FileType {
+    pub fn icon(&self) -> &'static str {
+        match self {
+            FileType::Directory => "folder.svg",
+            FileType::File => "file.svg",
+        }
+    }
+}
+
+pub(crate) struct FileEntry {
+    filename: String,
+    fullpath: String,
+    filetype: FileType,
+}
+
+impl FileEntry {
+    pub fn url(&self, server_path: &impl ToString) -> String {
+        match self.filetype {
+            FileType::Directory => format!("/browse/{}/{}", server_path.to_string(), self.fullpath),
+
+            FileType::File => format!("/get/{}/{}", server_path.to_string(), self.fullpath),
+        }
+    }
+}
+
+pub(crate) async fn browse_nopath(
+    State(state): State<WebState>,
+    Path(server_path): Path<String>,
+) -> Result<BrowsePage, Error> {
+    browse(State(state), Path((server_path, None))).await
+}
+
+// /// Browse the files in a server path.
+pub(crate) async fn browse(
+    State(state): State<WebState>,
+    Path((server_path, filepath)): Path<(String, Option<String>)>,
+) -> Result<BrowsePage, Error> {
+    // let path = path.server_path.clone();
+    let server_reader = state.configuration.read().await;
+    let server_filepath = match server_reader.server_paths.get(&server_path) {
         None => {
-            return Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::empty())?);
+            error!("Couldn't find server path {}", server_path);
+            return Err(Error::NotFound(server_path));
         }
         Some(p) => p,
     };
 
-    let mut body = format!("<head><html><h1>FileKid ({})</h1>\n", path);
+    // // get the list of files in the path
 
-    // get the list of files in the path
-    let entries = std::fs::read_dir(&filepath.path)
-        .map_err(|e| HttpError::for_internal_error(e.to_string()))?
+    let target_path = server_filepath
+        .path
+        .join(filepath.clone().unwrap_or("".to_string()));
+
+    let entries: Vec<FileEntry> = std::fs::read_dir(&target_path)
+        .map_err(|e| {
+            error!(
+                "Failed to read dir {} from server {}: {}",
+                server_path,
+                target_path.display(),
+                e
+            );
+            Error::from(e)
+        })?
         .map(|entry| {
             entry
-                .map_err(|e| HttpError::for_internal_error(format!("failed to read path: {:?}", e)))
+                .map_err(|e| {
+                    error!(
+                        "Failed to read dir {} from server {}: {}",
+                        server_path,
+                        target_path.display(),
+                        e
+                    );
+                    Error::from(e)
+                })
                 .and_then(|entry| {
-                    entry
-                        .file_name()
-                        .into_string()
-                        .map_err(|_| HttpError::for_internal_error("Invalid filename".to_string()))
+                    let filename = entry.file_name().into_string().map_err(|e| {
+                        error!(
+                            "Failed to get filename for {:?} from server {}: {:?}",
+                            entry, server_path, e
+                        );
+                        Error::InternalServerError(format!("Invalid Filename {:?} {:?}", entry, e))
+                    })?;
+                    let fullpath = match &filepath {
+                        Some(p) => format!("{}/{}", p, filename),
+                        None => filename.clone(),
+                    };
+
+                    let filetype = entry.file_type().map_err(|e| {
+                        error!(
+                            "Failed to get filetype for {:?} from server {}: {:?}",
+                            entry, server_path, e
+                        );
+                        Error::from(e)
+                    })?;
+
+                    Ok(FileEntry {
+                        filename,
+                        fullpath,
+                        filetype: if filetype.is_dir() {
+                            FileType::Directory
+                        } else {
+                            FileType::File
+                        },
+                    })
                 })
         })
-        .collect::<Result<Vec<String>, HttpError>>()?;
+        .collect::<Result<Vec<FileEntry>, Error>>()?;
 
-    for entry in entries {
-        body.push_str(&format!(
-            "<a href=\"/browse/{}/{}\">{}</a><br>\n",
-            &path, entry, entry
-        ));
-    }
+    let parent_path = match &filepath {
+        Some(p) => {
+            let mut p: Vec<_> = p.split("/").collect();
+            p.pop();
+            Some(p.join("/"))
+        }
+        None => None,
+    };
 
-    body.push_str("</html></head>");
-
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(http::header::CONTENT_TYPE, "text/html")
-        .body(body.into())?)
+    let res = BrowsePage {
+        server_path,
+        entries,
+        parent_path,
+        current_path: filepath.unwrap_or("".to_string()),
+    };
+    Ok(res)
 }

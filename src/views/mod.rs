@@ -1,34 +1,23 @@
 //! Web views for FileKid.
 
 pub mod browse;
+pub mod oidc;
+pub mod prelude;
 
-use dropshot::Body;
+use std::collections::HashMap;
 
-use crate::{prelude::*, FileKid};
+use prelude::*;
 
-#[endpoint {
-    method = GET,
-    path = "/",
-    unpublished = true,
+use crate::ServerPath;
 
-}]
-pub async fn home(
-    rqctx: RequestContext<FileKid>,
-    // _path: Path<AllPath>,
-) -> Result<Response<Body>, HttpError> {
-    let mut body = "<head><html><h1>FileKid</h1>\n".to_string();
+#[derive(Template)]
+#[template(path = "index.html")]
+pub(crate) struct HomePage {
+    server_paths: HashMap<String, ServerPath>,
+}
 
-    for (server, server_config) in rqctx.context().config.server_paths.iter() {
-        body.push_str(&format!(
-            "<a href=\"/browse/{}\">{}</a> ({})<br>\n",
-            server,
-            server,
-            server_config.path.display()
-        ));
-    }
-
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(http::header::CONTENT_TYPE, "text/html")
-        .body(body.into())?)
+pub(crate) async fn home(State(state): State<WebState>) -> Result<HomePage, Error> {
+    Ok(HomePage {
+        server_paths: state.configuration.read().await.server_paths.clone(),
+    })
 }
