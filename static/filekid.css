@@ -1,9 +1,11 @@
+.filelist a  {
+    text-decoration: none;
+}
 .fileicon {
     width: 1.5em;
     height: 1.5em;
     margin: 2px;
     display: inline-block;
-
     vertical-align: middle;
 }
 
