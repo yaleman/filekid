@@ -27,8 +27,12 @@ impl LocalFs {
 }
 
 impl super::FileKidFs for LocalFs {
-    fn name(&self) -> &'static str {
-        "local"
+    fn name(&self) -> String {
+        format!("local:{}", self.base_path.display())
+    }
+
+    fn available(&self) -> Result<bool, Error> {
+        Ok(self.base_path.exists())
     }
 
     fn exists(&self, filepath: &str) -> Result<bool, Error> {

@@ -3,7 +3,8 @@
 {% block body %}
 <ul class="filelist">
     {% for (server, server_config) in server_paths %}
-    <li><a href="/browse/{{server}}/"><img src="/static/folder.svg" class="fileicon" /> {{server}}</a> ({{server_config.path.display()}})</li>
+    <li><a href="/browse/{{server}}/"><img src="/static/folder.svg"
+                class="fileicon" /> {{server}}</a></li>
     {% endfor %}
 </ul>
 {% endblock %}

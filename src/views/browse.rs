@@ -1,4 +1,7 @@
 //! This module contains the browse endpoint, which allows users to browse the files on the server.
+use std::fs::DirEntry;
+use std::path::PathBuf;
+
 use axum::extract::Path;
 use axum::http::HeaderMap;
 
@@ -38,14 +41,12 @@ pub(crate) async fn get_file(
         "Content-Type",
         mime_type.parse().map_err(|err| {
             error!(
-                "Failed to parse mime type for file {}: {}",
-                server_path_object.path.join(&filepath).display(),
-                err
+                "Failed to parse mime type for file {:?} -> {}: {}",
+                server_path_object.path, filepath, err
             );
             Error::InternalServerError(format!(
-                "Failed to parse mime type for file {}: {}",
-                server_path_object.path.join(&filepath).display(),
-                err
+                "Failed to parse mime type for file {:?} -> {}: {}",
+                server_path_object.path, filepath, err
             ))
         })?,
     );
@@ -75,6 +76,20 @@ impl FileType {
     }
 }
 
+impl TryFrom<&PathBuf> for FileType {
+    type Error = Error;
+
+    fn try_from(value: &PathBuf) -> Result<Self, Self::Error> {
+        if value.is_file() {
+            Ok(Self::File)
+        } else if value.is_dir() {
+            Ok(Self::Directory)
+        } else {
+            Err(Error::InvalidFileType(value.display().to_string()))
+        }
+    }
+}
+
 pub struct FileEntry {
     pub filename: String,
     pub fullpath: String,
@@ -88,6 +103,24 @@ impl FileEntry {
 
             FileType::File => format!("/get/{}/{}", server_path.to_string(), self.fullpath),
         }
+    }
+}
+
+impl TryFrom<DirEntry> for FileEntry {
+    type Error = Error;
+
+    fn try_from(value: DirEntry) -> Result<Self, Self::Error> {
+        let path = value.path();
+        let filename = path
+            .file_name()
+            .ok_or_else(|| Error::Generic("Couldn't get filename".to_string()))?;
+        let filename = filename.to_string_lossy().to_string();
+        let filetype = FileType::try_from(&path)?;
+        Ok(Self {
+            filename,
+            fullpath: path.to_string_lossy().to_string(),
+            filetype,
+        })
     }
 }
 

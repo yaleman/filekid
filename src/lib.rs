@@ -32,7 +32,7 @@ use std::sync::Arc;
 
 use cli::CliOpts;
 use error::Error;
-use fs::FileKidFsType;
+use fs::{FileKidFs, FileKidFsType};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
@@ -112,11 +112,11 @@ impl Config {
     /// Check that the configuration is valid.
     pub fn startup_check(&self) -> Result<(), Error> {
         for (server, server_config) in self.server_paths.iter() {
-            if !server_config.path.exists() {
+            let filekid: Box<dyn FileKidFs> = fs::fs_from_serverpath(server_config)?;
+            if !filekid.available()? {
                 return Err(Error::NotFound(format!(
-                    "Server path {} does not exist: {}",
-                    server,
-                    server_config.path.display()
+                    "Server path {} ({:?}) is not online",
+                    server, filekid,
                 )));
             }
         }
@@ -132,7 +132,8 @@ impl Config {
 /// A server path.
 pub struct ServerPath {
     /// The path on disk, can be relative or absolute.
-    pub path: PathBuf,
+    #[serde(default)]
+    pub path: Option<PathBuf>,
     #[serde(rename = "type")]
     pub type_: FileKidFsType,
 }
