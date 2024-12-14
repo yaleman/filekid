@@ -1,6 +1,6 @@
 //! Web UI things
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum_server::bind_rustls;
 use axum_server::tls_rustls::RustlsConfig;
 use std::path::PathBuf;
@@ -26,7 +26,7 @@ use tracing::{debug, error, info};
 
 use crate::constants::WEB_SERVER_DEFAULT_STATIC_PATH;
 use crate::oidc::OidcErrorHandler;
-use crate::views::browse::{browse, browse_nopath, get_file};
+use crate::views::browse::{browse, browse_nopath, get_file, upload_file, upload_nopath};
 use crate::{views, Config, Error, SendableConfig, WebServerControl, WebState};
 
 pub(crate) async fn handler_404() -> (StatusCode, &'static str) {
@@ -95,37 +95,12 @@ pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
         }))
         .layer(OidcLoginLayer::<EmptyAdditionalClaims>::new());
 
-    let oidc_auth_layer = ServiceBuilder::new()
-        .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
-            if let MiddlewareError::SessionNotFound = e {
-                error!("No OIDC session found, redirecting to logout to clear it client-side");
-            } else {
-                oidc_error_handler.handle_oidc_error(&e).await;
-            }
-            Redirect::to(Urls::Logout.as_ref()).into_response()
-        }))
-        .layer(
-            OidcAuthLayer::<EmptyAdditionalClaims>::discover_client(
-                frontend_url,
-                oidc_issuer,
-                oidc_client_id,
-                oidc_client_secret,
-                vec!["openid", "groups"]
-                    .into_iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-            )
-            .await
-            .map_err(|err| {
-                error!("Failed to set up OIDC: {:?}", err);
-                Error::from(err)
-            })?,
-        );
-
     let ui = Router::new()
         .route("/browse/:server_path/", get(browse_nopath))
         .route("/browse/:server_path/*filepath", get(browse))
         .route("/get/:server_path/*filepath", get(get_file))
+        .route("/upload/:server_path/", post(upload_nopath))
+        .route("/upload/:server_path/*filepath", post(upload_file))
         // after here, the routers don't *require* auth
         .route(Urls::Index.as_ref(), get(views::home));
 
@@ -136,13 +111,41 @@ pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
         )
         .route(Urls::RpLogout.as_ref(), get(views::oidc::rp_logout));
 
-    let app: Router<WebState> = match state.configuration.read().await.oauth2_disabled {
-        true => app.merge(ui),
-        false => app
-            .merge(ui)
-            .layer(oidc_login_service)
-            .layer(oidc_auth_layer),
-    };
+    let app: Router<WebState> =
+        match state.configuration.read().await.oauth2_disabled {
+            true => app.merge(ui),
+            false => {
+                let oidc_auth_layer = ServiceBuilder::new()
+    .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+        if let MiddlewareError::SessionNotFound = e {
+            error!("No OIDC session found, redirecting to logout to clear it client-side");
+        } else {
+            oidc_error_handler.handle_oidc_error(&e).await;
+        }
+        Redirect::to(Urls::Logout.as_ref()).into_response()
+    }))
+    .layer(
+        OidcAuthLayer::<EmptyAdditionalClaims>::discover_client(
+            frontend_url,
+            oidc_issuer,
+            oidc_client_id,
+            oidc_client_secret,
+            vec!["openid", "groups"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
+        )
+        .await
+        .map_err(|err| {
+            error!("Failed to set up OIDC: {:?}", err);
+            Error::from(err)
+        })?,
+    );
+                app.merge(ui)
+                    .layer(oidc_login_service)
+                    .layer(oidc_auth_layer)
+            }
+        };
 
     let app = app
         // after here, the URLs cannot have auth

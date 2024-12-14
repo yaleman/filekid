@@ -16,7 +16,7 @@ pub struct FileData {
 
 pub trait FileKidFs
 where
-    Self: std::fmt::Debug,
+    Self: std::fmt::Debug + Send,
 {
     fn name(&self) -> String;
     /// Does this filepath exist within the scope of this filesystem?

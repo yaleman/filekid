@@ -5,13 +5,23 @@
 {% endblock %}
 
 {% block body %}
+<form method="POST"
+  action="/upload/{{ server_path }}/{{ parent_path }}">
+  <label name="file_label"></label><input aria-labelledby="file_label"
+    type="file" name="file" />
+  <input type="submit" value="Upload" />
+</form>
+
 <ul class="filelist">
-  {% if let Some(parent_path) = parent_path %}
-  <li><a href="/browse/{{server_path}}/{{ parent_path }}"><img src="/static/folder.svg" class="fileicon" />..</a></li>
+  {% if !parent_path.is_empty() %}
+  <li><a href="/browse/{{server_path}}/{{ parent_path }}"><img
+        src="/static/folder.svg" class="fileicon" />..</a></li>
   {% else %}
   <li><a href="/"><img src="/static/folder.svg" class="fileicon" />Home</a></li>
   {% endif %} {% for entry in entries %}
-  <li><a href="{{ entry.url(server_path) }}"><img src="/static/{{entry.filetype.icon()}}" class="fileicon" /> {{ entry.filename }}</a></li>
+  <li><a href="{{ entry.url(server_path) }}"><img
+        src="/static/{{entry.filetype.icon()}}" class="fileicon" /> {{
+      entry.filename }}</a></li>
   {% endfor %}
 </ul>
 {% endblock %}

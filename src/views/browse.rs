@@ -4,6 +4,10 @@ use std::path::PathBuf;
 
 use axum::extract::Path;
 use axum::http::HeaderMap;
+use axum::response::Redirect;
+use axum::Form;
+use serde::Deserialize;
+use tracing::debug;
 
 use crate::fs::fs_from_serverpath;
 
@@ -58,7 +62,7 @@ pub(crate) async fn get_file(
 pub(crate) struct BrowsePage {
     server_path: String,
     entries: Vec<FileEntry>,
-    parent_path: Option<String>,
+    parent_path: String,
     current_path: String,
 }
 
@@ -163,9 +167,9 @@ pub(crate) async fn browse(
         Some(p) => {
             let mut p: Vec<_> = p.split("/").collect();
             p.pop();
-            Some(p.join("/"))
+            p.join("/")
         }
-        None => None,
+        None => "".to_string(),
     };
 
     let entries: Vec<FileEntry> = filekidfs.list_dir(filepath.clone())?;
@@ -176,4 +180,44 @@ pub(crate) async fn browse(
         current_path: filepath.unwrap_or("".to_string()),
     };
     Ok(res)
+}
+
+pub(crate) async fn upload_nopath(
+    State(state): State<WebState>,
+    Path(server_path): Path<String>,
+    Form(upload_form): Form<UploadForm>,
+) -> Result<Redirect, Error> {
+    upload_file(State(state), Path((server_path, None)), Form(upload_form)).await
+}
+
+#[derive(Deserialize, Debug)]
+pub(crate) struct UploadForm {
+    #[allow(dead_code)]
+    pub file: String,
+}
+
+pub(crate) async fn upload_file(
+    State(state): State<WebState>,
+    Path((server_path, filepath)): Path<(String, Option<String>)>,
+    Form(upload_form): Form<UploadForm>,
+) -> Result<Redirect, Error> {
+    let server_reader = state.configuration.read().await;
+
+    let server_path_object = match server_reader.server_paths.get(&server_path) {
+        None => {
+            error!("Couldn't find server path {}", server_path);
+            return Err(Error::NotFound(server_path));
+        }
+        Some(p) => p,
+    };
+
+    let _filekidfs = fs_from_serverpath(server_path_object)?;
+
+    debug!("form: {:?}", upload_form);
+
+    Ok(Redirect::temporary(&format!(
+        "/browse/{}/{}",
+        server_path,
+        filepath.unwrap_or("".to_string())
+    )))
 }

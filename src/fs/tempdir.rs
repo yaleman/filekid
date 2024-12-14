@@ -1,5 +1,7 @@
 //! Tempdir module, only works while the instance is up
 
+use std::path::PathBuf;
+
 use tracing::debug;
 
 use crate::error::Error;
@@ -13,6 +15,17 @@ pub(crate) struct TempDir(tempfile::TempDir);
 impl TempDir {
     pub fn new() -> Result<Self, crate::error::Error> {
         Ok(Self(tempfile::tempdir()?))
+    }
+
+    /// Ensure that the thing we're looking at is in a "safe" path
+    fn is_in_basepath(&self, filename: &PathBuf) -> Result<bool, Error> {
+        Ok(self
+            .0
+            .path()
+            .join(filename)
+            .canonicalize()?
+            .ancestors()
+            .any(|path| path == self.0.path()))
     }
 }
 
@@ -51,8 +64,16 @@ impl FileKidFs for TempDir {
         }
     }
 
-    fn get_file(&self, _filedata: &super::FileData) -> Result<Vec<u8>, crate::error::Error> {
-        todo!()
+    fn get_file(&self, filedata: &super::FileData) -> Result<Vec<u8>, crate::error::Error> {
+        let target_file = self.0.path().join(&filedata.filepath).canonicalize()?;
+
+        if !self.is_in_basepath(&target_file)? {
+            return Err(Error::NotAuthorized(
+                "Path is outside of base path".to_string(),
+            ));
+        }
+
+        std::fs::read(target_file).map_err(|e| Error::Generic(e.to_string()))
     }
 
     fn put_file(
@@ -60,11 +81,11 @@ impl FileKidFs for TempDir {
         _filedata: &super::FileData,
         _contents: &[u8],
     ) -> Result<(), crate::error::Error> {
-        todo!()
+        todo!("tempfile upload file functionality")
     }
 
     fn delete_file(&self, _filedata: &super::FileData) -> Result<(), crate::error::Error> {
-        todo!()
+        todo!("tempdir delete file functionality")
     }
 
     fn list_dir(
