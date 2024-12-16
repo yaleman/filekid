@@ -25,6 +25,6 @@ tokio = { version = "1.42.0", features = [
     "full",
 ] }
 tower = "0.5.2"
-tower-http = { version = "0.6.2", features = ["fs"] }
+tower-http = { version = "0.6.2", features = ["fs", "limit"] }
 tower-sessions = "0.13.0"
 tracing = "0.1.41"

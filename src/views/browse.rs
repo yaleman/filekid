@@ -2,12 +2,11 @@
 use std::fs::DirEntry;
 use std::path::PathBuf;
 
-use axum::extract::Path;
+use axum::extract::{Multipart, Path};
 use axum::http::HeaderMap;
 use axum::response::Redirect;
-use axum::Form;
 use serde::Deserialize;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::fs::fs_from_serverpath;
 
@@ -185,9 +184,9 @@ pub(crate) async fn browse(
 pub(crate) async fn upload_nopath(
     State(state): State<WebState>,
     Path(server_path): Path<String>,
-    Form(upload_form): Form<UploadForm>,
+    multipart: Multipart,
 ) -> Result<Redirect, Error> {
-    upload_file(State(state), Path((server_path, None)), Form(upload_form)).await
+    upload_file(State(state), Path((server_path, None)), multipart).await
 }
 
 #[derive(Deserialize, Debug)]
@@ -199,7 +198,7 @@ pub(crate) struct UploadForm {
 pub(crate) async fn upload_file(
     State(state): State<WebState>,
     Path((server_path, filepath)): Path<(String, Option<String>)>,
-    Form(upload_form): Form<UploadForm>,
+    mut multipart: Multipart,
 ) -> Result<Redirect, Error> {
     let server_reader = state.configuration.read().await;
 
@@ -213,7 +212,37 @@ pub(crate) async fn upload_file(
 
     let _filekidfs = fs_from_serverpath(server_path_object)?;
 
-    debug!("form: {:?}", upload_form);
+    while let Ok(Some(field)) = multipart.next_field().await {
+        if let Some(field_name) = field.name() {
+            if field_name != "file" {
+                warn!(
+                    "File upload attempted using erroneous field name {} - ignoring",
+                    field_name
+                );
+                continue;
+            }
+
+            let file_name = match field.file_name() {
+                Some(name) => name.to_owned(),
+                None => {
+                    warn!("File upload attempted without a filename - ignoring");
+                    continue;
+                }
+            };
+            // let content_type = field.content_type().unwrap().to_string();
+            let data = field.bytes().await.map_err(|err| {
+                error!("Failed to read file data: {:?}", err);
+                Error::InternalServerError("Failed to read file data".to_string())
+            })?;
+
+            debug!(
+                "Length of `{}`) is {} bytes",
+                file_name,
+                // content_type,
+                data.len()
+            );
+        }
+    }
 
     Ok(Redirect::temporary(&format!(
         "/browse/{}/{}",

@@ -11,13 +11,14 @@ use tower_http::services::ServeDir;
 
 use askama_axum::IntoResponse;
 use axum::error_handling::HandleErrorLayer;
-use axum::extract::State;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{StatusCode, Uri};
 use axum::response::Redirect;
 use axum::Router;
 use axum_oidc::error::MiddlewareError;
 use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer};
 use tower::ServiceBuilder;
+use tower_http::limit::RequestBodyLimitLayer;
 
 use tower_sessions::cookie::time::Duration;
 use tower_sessions::cookie::SameSite;
@@ -96,11 +97,16 @@ pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
         .layer(OidcLoginLayer::<EmptyAdditionalClaims>::new());
 
     let ui = Router::new()
+        .route("/upload/:server_path/", post(upload_nopath))
+        .route("/upload/:server_path/*filepath", post(upload_file))
+        // TODO: this is pretty janky but it works for now
+        .layer(DefaultBodyLimit::disable())
+        .layer(RequestBodyLimitLayer::new(
+            state.configuration.read().await.max_upload_mb * 1024 * 1024,
+        ))
         .route("/browse/:server_path/", get(browse_nopath))
         .route("/browse/:server_path/*filepath", get(browse))
         .route("/get/:server_path/*filepath", get(get_file))
-        .route("/upload/:server_path/", post(upload_nopath))
-        .route("/upload/:server_path/*filepath", post(upload_file))
         // after here, the routers don't *require* auth
         .route(Urls::Index.as_ref(), get(views::home));
 
