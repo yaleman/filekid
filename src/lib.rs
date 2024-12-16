@@ -103,6 +103,13 @@ impl Config {
 
     /// Load the configuration from a file.
     pub fn from_file(filename: &PathBuf) -> Result<Self, Error> {
+        if !filename.exists() {
+            return Err(Error::Configuration(format!(
+                "Config file {} does not exist",
+                filename.display()
+            )));
+        }
+
         let config = std::fs::read_to_string(filename)?;
         serde_json::from_str(&config).map_err(|e| {
             eprintln!("Failed to parse config: {:?}", e);
