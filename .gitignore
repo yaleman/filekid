@@ -1,3 +1,4 @@
 /target
 filekid.json
 .envrc
+tarpaulin-report.html
