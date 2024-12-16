@@ -23,6 +23,8 @@ pub enum Error {
     NotAuthorized(String),
     /// Can't handle this file type yet
     InvalidFileType(String),
+    /// You did something weird
+    BadRequest(String),
 }
 
 impl From<axum_oidc::error::Error> for Error {
@@ -48,8 +50,9 @@ impl IntoResponse for Error {
             Error::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::NotAuthorized(_) => StatusCode::FORBIDDEN,
             Error::InvalidFileType(_) => StatusCode::BAD_REQUEST,
+            Error::BadRequest(_) => StatusCode::BAD_REQUEST,
         };
-        (statuscode, format!("{:?}", self)).into_response()
+        (statuscode, format!("{}", self)).into_response()
     }
 }
 
@@ -64,6 +67,7 @@ impl Display for Error {
             Error::Io(e) => write!(f, "IO error: {}", e),
             Error::NotAuthorized(e) => write!(f, "Not authorized: {}", e),
             Error::InvalidFileType(e) => write!(f, "Invalid file type: {}", e),
+            Error::BadRequest(e) => write!(f, "Bad request: {}", e),
         }
     }
 }

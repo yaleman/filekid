@@ -234,13 +234,7 @@ pub async fn run_web_server(
 ) -> Result<(), Error> {
     let app = build_app(
         // TODO web_tx impl
-        WebState::new(
-            web_tx.clone(),
-            // db,
-            configuration.clone(),
-            // Some(registry),
-            config_filepath,
-        ),
+        WebState::new(web_tx.clone(), configuration.clone(), config_filepath).await?,
     )
     .await?;
 

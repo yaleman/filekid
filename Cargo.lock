@@ -859,6 +859,7 @@ version = "0.1.0"
 dependencies = [
  "askama",
  "askama_axum",
+ "async-trait",
  "axum",
  "axum-oidc",
  "axum-server",

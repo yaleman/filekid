@@ -2,13 +2,13 @@
 use std::fs::DirEntry;
 use std::path::PathBuf;
 
+use axum::body::Bytes;
 use axum::extract::{Multipart, Path};
 use axum::http::HeaderMap;
 use axum::response::Redirect;
-use serde::Deserialize;
 use tracing::{debug, warn};
 
-use crate::fs::fs_from_serverpath;
+use crate::fs::{fs_from_serverpath, FileData};
 
 use super::prelude::*;
 
@@ -16,7 +16,6 @@ use super::prelude::*;
 
 pub(crate) async fn get_file(
     State(state): State<WebState>,
-
     Path((server_path, filepath)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, Error> {
     let server_reader = state.configuration.read().await;
@@ -31,6 +30,7 @@ pub(crate) async fn get_file(
     let filekidfs = fs_from_serverpath(server_path_object)?;
 
     if !filekidfs.exists(&filepath)? {
+        error!("Couldn't find file!");
         return Err(Error::NotFound(filepath.to_string()));
     }
 
@@ -53,7 +53,11 @@ pub(crate) async fn get_file(
             ))
         })?,
     );
-    Ok((StatusCode::OK, headers, filekidfs.get_file(&metadata)?))
+    Ok((
+        StatusCode::OK,
+        headers,
+        filekidfs.get_file(metadata).await??,
+    ))
 }
 
 #[derive(Template)]
@@ -65,6 +69,7 @@ pub(crate) struct BrowsePage {
     current_path: String,
 }
 
+#[derive(Debug)]
 pub enum FileType {
     Directory,
     File,
@@ -93,6 +98,7 @@ impl TryFrom<&PathBuf> for FileType {
     }
 }
 
+#[derive(Debug)]
 pub struct FileEntry {
     pub filename: String,
     pub fullpath: String,
@@ -152,13 +158,14 @@ pub(crate) async fn browse(
 
     let filekidfs = fs_from_serverpath(server_path_object)?;
 
-    if !filekidfs.exists(
-        &filepath
-            .clone()
-            .map(|p| p.trim_start_matches('/').to_string())
-            .clone()
-            .unwrap_or("".into()),
-    )? {
+    let target_filepath = filepath
+        .clone()
+        .map(|p| p.trim_start_matches('/').to_string())
+        .clone()
+        .unwrap_or("".into());
+
+    if !filekidfs.exists(&target_filepath)? {
+        error!("Couldn't find file path {:?}", target_filepath);
         return Err(Error::NotFound(filepath.unwrap_or("".into())));
     }
 
@@ -189,12 +196,6 @@ pub(crate) async fn upload_nopath(
     upload_file(State(state), Path((server_path, None)), multipart).await
 }
 
-#[derive(Deserialize, Debug)]
-pub(crate) struct UploadForm {
-    #[allow(dead_code)]
-    pub file: String,
-}
-
 pub(crate) async fn upload_file(
     State(state): State<WebState>,
     Path((server_path, filepath)): Path<(String, Option<String>)>,
@@ -210,11 +211,19 @@ pub(crate) async fn upload_file(
         Some(p) => p,
     };
 
-    let _filekidfs = fs_from_serverpath(server_path_object)?;
+    let filekidfs = fs_from_serverpath(server_path_object)?;
+
+    let mut uploaded_file: Option<FileData> = None;
+    let mut uploaded_data: Option<Bytes> = None;
+    // let mut overwrite: bool = false;
+
+    const FIELD_NAMES: [&str; 2] = ["file", "overwrite"];
+
+    let stripped_filepath = filepath.clone().unwrap_or_default();
 
     while let Ok(Some(field)) = multipart.next_field().await {
         if let Some(field_name) = field.name() {
-            if field_name != "file" {
+            if !FIELD_NAMES.contains(&field_name) {
                 warn!(
                     "File upload attempted using erroneous field name {} - ignoring",
                     field_name
@@ -222,31 +231,60 @@ pub(crate) async fn upload_file(
                 continue;
             }
 
-            let file_name = match field.file_name() {
-                Some(name) => name.to_owned(),
-                None => {
-                    warn!("File upload attempted without a filename - ignoring");
+            if field_name == "file" {
+                let file_name = match field.file_name() {
+                    Some(name) => name.to_owned(),
+                    None => {
+                        warn!("File upload attempted without a filename - ignoring");
+                        continue;
+                    }
+                };
+
+                let full_path = [stripped_filepath.clone(), file_name.clone()].join("/");
+
+                if filekidfs.exists(&full_path)? {
+                    warn!("File {} already exists - ignoring", file_name);
                     continue;
                 }
-            };
-            // let content_type = field.content_type().unwrap().to_string();
-            let data = field.bytes().await.map_err(|err| {
-                error!("Failed to read file data: {:?}", err);
-                Error::InternalServerError("Failed to read file data".to_string())
-            })?;
 
-            debug!(
-                "Length of `{}`) is {} bytes",
-                file_name,
-                // content_type,
-                data.len()
-            );
+                let data = field.bytes().await.map_err(|err| {
+                    error!("Failed to read file data: {:?}", err);
+                    Error::InternalServerError("Failed to read file data".to_string())
+                })?;
+
+                debug!(
+                    "Length of `{}`) is {} bytes",
+                    file_name,
+                    // content_type,
+                    data.len()
+                );
+
+                uploaded_file = Some(FileData {
+                    filepath: stripped_filepath.clone().into(),
+                    filename: file_name,
+                    size: Some(data.len() as u64),
+                });
+                uploaded_data = Some(data);
+            } else if field_name == "overwrite" {
+                // overwrite = true;
+                // TODO: handle the ovewrite field
+            }
         }
     }
 
-    Ok(Redirect::temporary(&format!(
-        "/browse/{}/{}",
-        server_path,
-        filepath.unwrap_or("".to_string())
-    )))
+    // have we got a file?
+    match (uploaded_file, uploaded_data) {
+        (Some(uploaded_file), Some(uploaded_data)) => {
+            filekidfs.put_file(&uploaded_file, &uploaded_data).await?;
+            Ok(Redirect::to(&format!(
+                "/browse/{}/{}",
+                server_path,
+                filepath.unwrap_or("".to_string())
+            )))
+        }
+        _ => {
+            warn!("No file uploaded");
+            Err(Error::BadRequest("No file uploaded".to_string()))
+        }
+    }
 }

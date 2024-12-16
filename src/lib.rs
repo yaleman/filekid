@@ -27,7 +27,7 @@ pub mod web;
 
 use config::Config;
 use error::Error;
-use fs::FileKidFsType;
+use fs::{fs_from_serverpath, FileKidFs, FileKidFsType};
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -68,15 +68,27 @@ pub struct WebState {
 
 impl WebState {
     /// Create a new state.
-    pub fn new(
+    pub async fn new(
         web_tx: tokio::sync::mpsc::Sender<WebServerControl>,
         configuration: SendableConfig,
         config_filepath: PathBuf,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        Ok(Self {
             configuration,
             web_tx,
             config_filepath,
-        }
+        })
+    }
+
+    pub async fn get_filekidfs(&self, filepath: &str) -> Result<Box<dyn FileKidFs>, Error> {
+        let config = self.configuration.read().await;
+        let server_path = config
+            .server_paths
+            .get(filepath)
+            .ok_or_else(|| Error::Configuration("No such server path".to_string()))?
+            .clone();
+        drop(config);
+
+        fs_from_serverpath(&server_path)
     }
 }

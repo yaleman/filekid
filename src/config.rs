@@ -100,12 +100,19 @@ impl Config {
     /// Check that the configuration is valid.
     pub fn startup_check(&self) -> Result<(), Error> {
         for (server, server_config) in self.server_paths.iter() {
-            let filekid: Box<dyn FileKidFs> = fs::fs_from_serverpath(server_config)?;
-            if !filekid.available()? {
-                return Err(Error::NotFound(format!(
-                    "Server path {} ({:?}) is not online",
-                    server, filekid,
-                )));
+            match server_config.type_ {
+                fs::FileKidFsType::TempDir => {
+                    // it's fine!
+                }
+                fs::FileKidFsType::Local => {
+                    let filekid: Box<dyn FileKidFs> = fs::fs_from_serverpath(server_config)?;
+                    if !filekid.available()? {
+                        return Err(Error::NotFound(format!(
+                            "Server path {} ({:?}) is not online",
+                            server, filekid,
+                        )));
+                    }
+                }
             }
         }
         Ok(())

@@ -2,105 +2,145 @@
 
 use std::path::PathBuf;
 
-use tracing::debug;
+use tracing::*;
 
 use crate::error::Error;
 use crate::views::browse::FileEntry;
 
-use super::FileKidFs;
+use super::{FileData, FileKidFs};
 
 #[derive(Debug)]
-pub(crate) struct TempDir(tempfile::TempDir);
+pub(crate) struct TempDir(PathBuf);
 
 impl TempDir {
-    pub fn new() -> Result<Self, crate::error::Error> {
-        Ok(Self(tempfile::tempdir()?))
+    pub fn new(path: PathBuf) -> Self {
+        Self(path)
     }
 
     /// Ensure that the thing we're looking at is in a "safe" path
+    #[instrument(level = "debug", skip(self))]
     fn is_in_basepath(&self, filename: &PathBuf) -> Result<bool, Error> {
-        Ok(self
-            .0
-            .path()
-            .join(filename)
-            .canonicalize()?
-            .ancestors()
-            .any(|path| path == self.0.path()))
+        Ok(self.0.join(filename).ancestors().any(|path| path == self.0))
     }
 }
 
+#[async_trait::async_trait]
 impl FileKidFs for TempDir {
     fn name(&self) -> String {
         "tempdir".to_string()
     }
 
     fn available(&self) -> Result<bool, crate::error::Error> {
-        Ok(self.0.path().exists())
+        Ok(self.0.exists())
     }
 
+    #[instrument(level = "debug", skip(self))]
     fn exists(&self, filepath: &str) -> Result<bool, crate::error::Error> {
-        debug!("{:?} exists: {}", self, filepath);
-        Ok(true)
+        if filepath.is_empty() {
+            // special case since it's a fresh tempdir
+            return Ok(true);
+        }
+
+        let target_file = self.0.join(filepath);
+
+        debug!(
+            "Checking if {} exists under base path {}",
+            target_file.display(),
+            self.0.display()
+        );
+
+        Ok(target_file.exists() && self.is_in_basepath(&PathBuf::from(filepath))?)
     }
 
+    #[instrument(level = "debug", skip(self))]
     fn get_data(&self, path: &str) -> Result<super::FileData, crate::error::Error> {
-        let target = self.0.path().join(path).canonicalize()?;
-        if self.0.path().ancestors().any(|p| p == target) {
-            if let Some(filename) = target.file_name() {
-                Ok(super::FileData {
-                    filename: filename.to_string_lossy().to_string(),
-                    filepath: target.to_string_lossy().to_string(),
-                    size: Some(target.metadata()?.len()),
-                })
-            } else {
-                Err(crate::error::Error::Generic(
-                    "Couldn't get filename".to_string(),
-                ))
-            }
+        let target = self.0.join(path);
+
+        debug!(
+            "Checking if {} is in base path {}",
+            target.display(),
+            self.0.display()
+        );
+
+        self.is_in_basepath(&path.into())?;
+
+        if let Some(filename) = target.file_name() {
+            Ok(super::FileData {
+                filename: filename.to_string_lossy().to_string(),
+                filepath: target.parent().unwrap_or(&self.0).to_path_buf(),
+                size: Some(target.metadata()?.len()),
+            })
         } else {
-            Err(crate::error::Error::NotAuthorized(
-                "Path is outside of parent path".to_string(),
+            Err(crate::error::Error::Generic(
+                "Couldn't get filename".to_string(),
             ))
         }
     }
 
-    fn get_file(&self, filedata: &super::FileData) -> Result<Vec<u8>, crate::error::Error> {
-        let target_file = self.0.path().join(&filedata.filepath).canonicalize()?;
-
-        if !self.is_in_basepath(&target_file)? {
-            return Err(Error::NotAuthorized(
-                "Path is outside of base path".to_string(),
-            ));
+    async fn get_file(&self, filedata: FileData) -> Result<tokio::io::Result<Vec<u8>>, Error> {
+        if !self.is_in_basepath(&filedata.target_file().into())? {
+            return Err(Error::NotAuthorized(format!(
+                "Path '{}' is outside of base path",
+                &filedata.target_file()
+            )));
         }
 
-        std::fs::read(target_file).map_err(|e| Error::Generic(e.to_string()))
+        Ok(tokio::fs::read(&filedata.target_file()).await)
     }
 
-    fn put_file(
+    #[instrument(level = "debug", skip(self, contents))]
+    async fn put_file(
         &self,
-        _filedata: &super::FileData,
-        _contents: &[u8],
+        filedata: &super::FileData,
+        contents: &[u8],
     ) -> Result<(), crate::error::Error> {
-        todo!("tempfile upload file functionality")
+        let target_path = [
+            filedata.filepath.clone().to_string_lossy().to_string(),
+            filedata.filename.clone(),
+        ]
+        .join("/");
+        let target_path = target_path.trim_start_matches("/");
+
+        if self.is_in_basepath(&target_path.into())? {
+            debug!("{:?}", filedata);
+            let target_file = self.0.join(&filedata.filepath).join(&filedata.filename);
+            debug!("Writing to '{}'", target_file.display());
+
+            tokio::fs::write(target_file, contents).await?;
+            Ok(())
+        } else {
+            Err(crate::error::Error::NotAuthorized(format!(
+                "Path {} is outside of parent path",
+                target_path
+            )))
+        }
     }
 
+    #[instrument(level = "debug", skip(self))]
     fn delete_file(&self, _filedata: &super::FileData) -> Result<(), crate::error::Error> {
         todo!("tempdir delete file functionality")
     }
 
+    #[instrument(level = "debug", skip(self))]
     fn list_dir(
         &self,
         path: Option<String>,
     ) -> Result<Vec<crate::views::browse::FileEntry>, Error> {
         let path_addition = path.unwrap_or_default();
 
-        let target_path = self.0.path().join(path_addition);
+        let target_path = self.0.join(&path_addition);
+
+        debug!("listing files for {}", target_path.display());
         let mut res = Vec::new();
 
         if let Ok(readdir) = target_path.read_dir() {
             for direntry in readdir {
                 let direntry = direntry.map_err(Error::from)?;
-                res.push(FileEntry::try_from(direntry)?);
+                let mut fileentry = FileEntry::try_from(direntry)?;
+                fileentry.fullpath = format!("{}/{}", path_addition, fileentry.filename)
+                    .trim_start_matches("/")
+                    .to_string();
+                res.push(fileentry);
             }
         }
 
@@ -111,11 +151,14 @@ impl FileKidFs for TempDir {
 #[cfg(test)]
 mod tests {
 
+    use tempfile::tempdir;
+
     use crate::fs::FileKidFs;
 
     #[test]
     fn test_tempdir_get_outside_parent() {
-        let tempdir = super::TempDir::new().expect("Failed to create tempdir");
+        let tempdir = tempdir().expect("Failed to create tempdir");
+        let tempdir = super::TempDir::new(tempdir.path().into());
         assert!(tempdir.get_data("/../../../test.txt").is_err());
     }
 }
