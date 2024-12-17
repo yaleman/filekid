@@ -207,6 +207,8 @@ mod tests {
             base_path: temp_dir_path.clone(),
         };
 
+        assert!(fs.available().expect("Isn't available!"));
+
         assert!(fs.name().contains(&temp_dir_path.display().to_string()));
     }
     #[tokio::test]

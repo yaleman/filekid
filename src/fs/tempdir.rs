@@ -181,6 +181,8 @@ mod tests {
         let fs = TempDir::new(temp_dir_path.clone());
 
         assert!(fs.name().contains(&temp_dir_path.display().to_string()));
+
+        assert!(fs.available().expect("Isn't available!"));
     }
     #[tokio::test]
     async fn test_list_dir() {
