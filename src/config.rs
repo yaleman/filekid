@@ -4,7 +4,7 @@ use crate::cli::CliOpts;
 use crate::error::Error;
 use crate::fs::{self, FileKidFs};
 use crate::ServerPath;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::num::NonZeroU16;
@@ -22,7 +22,7 @@ fn default_max_upload_mb() -> usize {
     1024
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
 /// Configuration for the FileKid server.
 pub struct Config {
     #[serde(default = "bind_address_default")]
@@ -120,5 +120,36 @@ impl Config {
 
     pub fn listen_addr(&self) -> String {
         format!("{}:{}", self.bind_address, self.port)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::Ipv4Addr;
+
+    #[test]
+    fn test_config() {
+        let config = Config {
+            bind_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            port: NonZeroU16::new(6969).unwrap(),
+            default_request_body_max_bytes: None,
+            server_paths: HashMap::new(),
+            frontend_domain: "example.com".to_string(),
+            oidc_issuer: "https://example.com".to_string(),
+            oidc_client_id: "client_id".to_string(),
+            oidc_client_secret: None,
+            static_path: None,
+            cert_file: PathBuf::from("cert.pem"),
+            cert_key: PathBuf::from("key.pem"),
+            frontend_url: "https://example.com".to_string(),
+            debug: false,
+            oauth2_disabled: false,
+            max_upload_mb: 1024,
+        };
+
+        let config_str = serde_json::to_string(&config).unwrap();
+        let config2: Config = serde_json::from_str(&config_str).unwrap();
+        assert_eq!(config, config2);
     }
 }

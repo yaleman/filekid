@@ -28,12 +28,12 @@ pub mod web;
 use config::Config;
 use error::Error;
 use fs::{fs_from_serverpath, FileKidFs, FileKidFsType};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Serialize, PartialEq)]
 /// A server path.
 pub struct ServerPath {
     /// The path on disk, can be relative or absolute.

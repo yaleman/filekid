@@ -23,6 +23,10 @@ impl LocalFs {
             .ancestors()
             .any(|path| path == self.base_path))
     }
+
+    pub fn new(base_path: PathBuf) -> Self {
+        Self { base_path }
+    }
 }
 
 #[async_trait::async_trait]
@@ -54,6 +58,10 @@ impl FileKidFs for LocalFs {
     #[instrument(level = "debug", skip(self))]
     fn get_data(&self, path: &str) -> Result<super::FileData, Error> {
         self.is_in_basepath(&path.into())?;
+
+        if !self.base_path.join(path).exists() {
+            return Err(Error::NotFound(format!("Can't find {}", path)));
+        }
 
         let actual_filepath = self.base_path.join(path);
 
@@ -195,6 +203,8 @@ impl FileKidFs for LocalFs {
 
 #[cfg(test)]
 mod tests {
+    use crate::log::setup_logging;
+
     #[tokio::test]
     async fn test_localfs_name() {
         use super::*;
@@ -203,9 +213,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let temp_dir_path = temp_dir.path().to_path_buf();
 
-        let fs = LocalFs {
-            base_path: temp_dir_path.clone(),
-        };
+        let fs = LocalFs::new(temp_dir_path.clone());
 
         assert!(fs.available().expect("Isn't available!"));
 
@@ -218,15 +226,14 @@ mod tests {
         use std::io::Write;
         use tempfile::tempdir;
 
+        let _ = setup_logging(true, true);
         let temp_dir = tempdir().unwrap();
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
         file.write_all(b"Hello, world!").unwrap();
 
-        let fs = LocalFs {
-            base_path: temp_dir_path.clone(),
-        };
+        let fs = LocalFs::new(temp_dir_path.clone());
 
         let entries = fs.list_dir(None).unwrap();
         assert_eq!(entries.len(), 1);
@@ -241,5 +248,23 @@ mod tests {
         assert_eq!(entries[0].filename, "test.txt");
         assert_eq!(entries[0].fullpath, "./test.txt");
         assert_eq!(entries[0].filetype, FileType::File);
+    }
+
+    #[test]
+    fn test_get_data() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = LocalFs::new(temp_dir_path);
+        let res = fs.get_data("thiscannotexist.foo");
+
+        dbg!(&res);
+
+        assert!(res.is_err());
     }
 }

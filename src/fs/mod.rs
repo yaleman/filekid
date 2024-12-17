@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::views::browse::FileEntry;
@@ -52,7 +52,7 @@ where
     fn available(&self) -> Result<bool, Error>;
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum FileKidFsType {
     Local,
@@ -67,9 +67,7 @@ pub fn fs_from_serverpath(server_path: &ServerPath) -> Result<Box<dyn FileKidFs>
                 Some(ref path) => path,
                 None => return Err(Error::Configuration("No path specified".to_string())),
             };
-            Ok(Box::new(local::LocalFs {
-                base_path: server_path.to_path_buf(),
-            }))
+            Ok(Box::new(local::LocalFs::new(server_path.to_path_buf())))
         }
         FileKidFsType::TempDir => match &server_path.path {
             None => Err(Error::Configuration(

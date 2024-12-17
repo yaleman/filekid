@@ -217,4 +217,20 @@ mod tests {
         assert_eq!(entries[0].fullpath, "./test.txt");
         assert_eq!(entries[0].filetype, FileType::File);
     }
+
+    #[test]
+    fn test_get_data() {
+        use super::*;
+
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = TempDir::new(temp_dir_path);
+
+        assert!(fs.get_data("thiscannotexist.foo").is_err());
+    }
 }
