@@ -27,7 +27,7 @@ impl TempDir {
 #[async_trait::async_trait]
 impl FileKidFs for TempDir {
     fn name(&self) -> String {
-        "tempdir".to_string()
+        format!("tempdir ({})", self.0.display())
     }
 
     fn available(&self) -> Result<bool, crate::error::Error> {
@@ -129,6 +129,12 @@ impl FileKidFs for TempDir {
         let path_addition = path.unwrap_or_default();
 
         let target_path = self.0.join(&path_addition);
+        if !target_path.is_dir() {
+            return Err(Error::BadRequest(format!(
+                "{} is not a directory",
+                path_addition
+            )));
+        }
 
         debug!("listing files for {}", target_path.display());
         let mut res = Vec::new();
@@ -154,11 +160,59 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::fs::FileKidFs;
+    use crate::log::setup_logging;
+    use crate::views::browse::FileType;
 
     #[test]
     fn test_tempdir_get_outside_parent() {
         let tempdir = tempdir().expect("Failed to create tempdir");
         let tempdir = super::TempDir::new(tempdir.path().into());
         assert!(tempdir.get_data("/../../../test.txt").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_localfs_name() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = TempDir::new(temp_dir_path.clone());
+
+        assert!(fs.name().contains(&temp_dir_path.display().to_string()));
+    }
+    #[tokio::test]
+    async fn test_list_dir() {
+        use super::*;
+        use std::fs::File;
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
+        file.write_all(b"Hello, world!").unwrap();
+
+        let fs = TempDir::new(temp_dir_path);
+
+        let entries = fs.list_dir(None).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].filename, "test.txt");
+        assert_eq!(entries[0].fullpath, "test.txt");
+        assert_eq!(entries[0].filetype, FileType::File);
+
+        let bad_test = fs.list_dir(Some("test.txt".to_string()));
+        dbg!(&bad_test);
+        assert!(bad_test.is_err());
+
+        let entries = fs.list_dir(Some(".".to_string())).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].filename, "test.txt");
+        assert_eq!(entries[0].fullpath, "./test.txt");
+        assert_eq!(entries[0].filetype, FileType::File);
     }
 }

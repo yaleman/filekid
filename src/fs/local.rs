@@ -115,11 +115,20 @@ impl FileKidFs for LocalFs {
 
     #[instrument(level = "debug", skip(self))]
     fn list_dir(&self, path: Option<String>) -> Result<Vec<FileEntry>, Error> {
-        let target_path = self.base_path.join(path.clone().unwrap_or("".to_string()));
+        let path_addition = path.clone().unwrap_or_default();
+
+        let target_path = self.base_path.join(&path_addition);
         if !self.is_in_basepath(&target_path)? {
             return Err(Error::NotAuthorized(
                 "Path is outside of base path".to_string(),
             ));
+        }
+
+        if !target_path.is_dir() {
+            return Err(Error::BadRequest(format!(
+                "{} is not a directory",
+                path_addition
+            )));
         }
 
         std::fs::read_dir(&target_path)
@@ -181,5 +190,54 @@ impl FileKidFs for LocalFs {
                     })
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_localfs_name() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = LocalFs {
+            base_path: temp_dir_path.clone(),
+        };
+
+        assert!(fs.name().contains(&temp_dir_path.display().to_string()));
+    }
+    #[tokio::test]
+    async fn test_list_dir() {
+        use super::*;
+        use std::fs::File;
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
+        file.write_all(b"Hello, world!").unwrap();
+
+        let fs = LocalFs {
+            base_path: temp_dir_path.clone(),
+        };
+
+        let entries = fs.list_dir(None).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].filename, "test.txt");
+        assert_eq!(entries[0].fullpath, "test.txt");
+        assert_eq!(entries[0].filetype, FileType::File);
+
+        assert!(fs.list_dir(Some("test.txt".to_string())).is_err());
+
+        let entries = fs.list_dir(Some(".".to_string())).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].filename, "test.txt");
+        assert_eq!(entries[0].fullpath, "./test.txt");
+        assert_eq!(entries[0].filetype, FileType::File);
     }
 }

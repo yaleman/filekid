@@ -2,3 +2,4 @@
 filekid.json
 .envrc
 tarpaulin-report.html
+files/*

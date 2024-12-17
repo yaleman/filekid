@@ -69,7 +69,7 @@ pub(crate) struct BrowsePage {
     current_path: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum FileType {
     Directory,
     File,
@@ -267,7 +267,7 @@ pub(crate) async fn upload_file(
                 uploaded_data = Some(data);
             } else if field_name == "overwrite" {
                 // overwrite = true;
-                // TODO: handle the ovewrite field
+                // TODO: handle the overwrite field
             }
         }
     }
