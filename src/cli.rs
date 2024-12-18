@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 pub struct CliOpts {
     #[clap(short, long)]
     pub config: Option<PathBuf>,

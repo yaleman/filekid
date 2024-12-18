@@ -93,7 +93,7 @@ impl Config {
 
         let config = std::fs::read_to_string(filename)?;
         serde_json::from_str(&config).map_err(|e| {
-            eprintln!("Failed to parse config: {:?}", e);
+            eprintln!("Failed to parse config as JSONj: {}", e);
             Error::Configuration(e.to_string())
         })
     }
@@ -151,5 +151,79 @@ mod tests {
         let config_str = serde_json::to_string(&config).unwrap();
         let config2: Config = serde_json::from_str(&config_str).unwrap();
         assert_eq!(config, config2);
+
+        let _test_config_from_file = Config::from_file(&PathBuf::from("files/example-config.json"))
+            .expect("Failed to load config from file");
+
+        assert!(Config::from_file(&PathBuf::from("files/nonexistent.json")).is_err());
+        let badconfig = Config::from_file(&PathBuf::from("README.md"));
+
+        dbg!(&badconfig);
+        assert!(badconfig.is_err());
+
+        Config::new(CliOpts::default()).expect("Failed to get config from cli defaults");
+    }
+
+    #[test]
+    fn test_defaults() {
+        assert_eq!(
+            bind_address_default(),
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+        );
+
+        assert_eq!(default_max_upload_mb(), 1024);
+    }
+
+    #[test]
+    fn test_config_startup_check() {
+        let mut config = Config {
+            bind_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            port: NonZeroU16::new(6969).unwrap(),
+            default_request_body_max_bytes: None,
+            server_paths: HashMap::new(),
+            frontend_domain: "example.com".to_string(),
+            oidc_issuer: "https://example.com".to_string(),
+            oidc_client_id: "client_id".to_string(),
+            oidc_client_secret: None,
+            static_path: None,
+            cert_file: PathBuf::from("cert.pem"),
+            cert_key: PathBuf::from("key.pem"),
+            frontend_url: "https://example.com".to_string(),
+            debug: false,
+            oauth2_disabled: false,
+            max_upload_mb: 1024,
+        };
+
+        assert_eq!(config.listen_addr(), "127.0.0.1:6969");
+
+        assert!(config.startup_check().is_ok());
+
+        let mut server_paths = HashMap::new();
+
+        server_paths.insert(
+            "tempdir".to_string(),
+            ServerPath {
+                type_: fs::FileKidFsType::TempDir,
+                path: None,
+            },
+        );
+        server_paths.insert(
+            "local".to_string(),
+            ServerPath {
+                type_: fs::FileKidFsType::Local,
+                path: Some(PathBuf::from("./")),
+            },
+        );
+        config.server_paths = server_paths;
+        config.server_paths.clear();
+        config.server_paths.insert(
+            "local_bad".to_string(),
+            ServerPath {
+                type_: fs::FileKidFsType::Local,
+                path: Some(PathBuf::from("/thiswontexistIhope")),
+            },
+        );
+
+        assert!(config.startup_check().is_err());
     }
 }
