@@ -71,3 +71,14 @@ impl Display for Error {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display() {
+        let e = Error::Generic("test".to_string());
+        assert_eq!(format!("{}", e), "Generic error: test");
+    }
+}
