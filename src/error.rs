@@ -1,11 +1,11 @@
 //! Error things
 
-use std::fmt::Display;
-
 use askama_axum::IntoResponse;
 use axum::http::StatusCode;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
-#[derive(Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error {
     /// Generic error
     Generic(String),
@@ -18,7 +18,7 @@ pub enum Error {
     /// Internal server error
     InternalServerError(String),
     /// IO things went bad
-    Io(std::io::Error),
+    Io(String),
     /// You've askked for something you're not allowed to have
     NotAuthorized(String),
     /// Can't handle this file type yet
@@ -35,7 +35,7 @@ impl From<axum_oidc::error::Error> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
+        Self::Io(e.to_string())
     }
 }
 
@@ -80,5 +80,69 @@ mod tests {
     fn test_display() {
         let e = Error::Generic("test".to_string());
         assert_eq!(format!("{}", e), "Generic error: test");
+
+        // go through the enum variants, make each one and test the various outputs
+        let e = Error::Generic("test".to_string());
+        assert_eq!(format!("{}", e), "Generic error: test");
+        assert_eq!(
+            e.clone().into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let e = Error::Configuration("config error".to_string());
+        assert_eq!(format!("{}", e), "Configuration error: config error");
+        assert_eq!(
+            e.clone().into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let e = Error::Oidc("oidc error".to_string());
+        assert_eq!(format!("{}", e), "OIDC error: oidc error");
+        assert_eq!(
+            e.clone().into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let e = Error::NotFound("not found".to_string());
+        assert_eq!(format!("{}", e), "Not found: not found");
+        assert_eq!(e.clone().into_response().status(), StatusCode::NOT_FOUND);
+
+        let e = Error::InternalServerError("internal error".to_string());
+        assert_eq!(format!("{}", e), "Internal server error: internal error");
+        assert_eq!(
+            e.clone().into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let e = Error::Io("io error".to_string());
+        assert_eq!(format!("{}", e), "IO error: io error");
+        assert_eq!(
+            e.clone().into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        let e = Error::NotAuthorized("not authorized".to_string());
+        assert_eq!(format!("{}", e), "Not authorized: not authorized");
+        assert_eq!(e.clone().into_response().status(), StatusCode::FORBIDDEN);
+
+        let e = Error::InvalidFileType("invalid file type".to_string());
+        assert_eq!(format!("{}", e), "Invalid file type: invalid file type");
+        assert_eq!(e.clone().into_response().status(), StatusCode::BAD_REQUEST);
+
+        let e = Error::BadRequest("bad request".to_string());
+        assert_eq!(format!("{}", e), "Bad request: bad request");
+        assert_eq!(e.clone().into_response().status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_error_from_axum_oidc() {
+        let e = axum_oidc::error::Error::UrlParsing(
+            openidconnect::url::ParseError::RelativeUrlWithoutBase,
+        );
+        let e = Error::from(e);
+        assert_eq!(
+            format!("{}", e),
+            "OIDC error: url parsing: RelativeUrlWithoutBase"
+        );
     }
 }

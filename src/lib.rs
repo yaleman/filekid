@@ -27,7 +27,7 @@ pub mod web;
 
 use config::Config;
 use error::Error;
-use fs::{fs_from_serverpath, FileKidFs, FileKidFsType};
+use fs::FileKidFsType;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -79,16 +79,27 @@ impl WebState {
             config_filepath,
         })
     }
+}
 
-    pub async fn get_filekidfs(&self, filepath: &str) -> Result<Box<dyn FileKidFs>, Error> {
-        let config = self.configuration.read().await;
-        let server_path = config
-            .server_paths
-            .get(filepath)
-            .ok_or_else(|| Error::Configuration("No such server path".to_string()))?
-            .clone();
-        drop(config);
+#[cfg(test)]
+mod tests {
+    use cli::CliOpts;
 
-        fs_from_serverpath(&server_path)
+    use super::*;
+
+    #[tokio::test]
+    async fn test_webstate() {
+        let (tx, _rx) = tokio::sync::mpsc::channel(1);
+        let config = Arc::new(RwLock::new(
+            Config::new(CliOpts::default()).expect("Failed to make a config"),
+        ));
+        let config_filepath = PathBuf::from("test");
+        let state = WebState::new(tx, config, config_filepath)
+            .await
+            .expect("Failed to get state");
+        assert_eq!(
+            *state.configuration.read().await,
+            Config::new(CliOpts::default()).expect("Failed to make a config")
+        );
     }
 }

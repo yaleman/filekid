@@ -11,6 +11,7 @@ axum = { version = "0.7.9", features = ["macros", "multipart", "http2"] }
 axum-oidc = "0.5.0"
 axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"] }
 clap = { version = "4.5.23", features = ["derive"] }
+enum-iterator = "2.1.0"
 env_logger = "0.11.5"
 log = { version = "0.4.22", features = ["serde"] }
 mime_guess = "2.0.5"
@@ -29,3 +30,6 @@ tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["fs", "limit"] }
 tower-sessions = "0.13.0"
 tracing = "0.1.41"
+
+[dev-dependencies]
+openidconnect = "3.5.0"
