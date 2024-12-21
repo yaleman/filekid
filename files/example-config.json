@@ -1,0 +1,16 @@
+{
+    "port": 8888,
+    "frontend_url": "https://example.com:8888",
+    "frontend_domain": "example.com",
+    "oidc_client_id": "filekid",
+    "oidc_issuer": "https://kanidm.example.com/oauth2/openid/filekid",
+    "cert_file": "/certs/example.com/fullchain.pem",
+    "cert_key": "/certs/example.com/privkey.pem",
+    "server_paths": {
+        "filekid": { "path": "./files", "type": "local" },
+        "tempdir": {
+            "type": "tempdir"
+        }
+    },
+    "max_upload_mb": 2048
+}
