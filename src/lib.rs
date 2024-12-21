@@ -91,7 +91,7 @@ mod tests {
     async fn test_webstate() {
         let (tx, _rx) = tokio::sync::mpsc::channel(1);
         let config = Arc::new(RwLock::new(
-            Config::new(CliOpts::default()).expect("Failed to make a config"),
+            Config::new(CliOpts::test_default()).expect("Failed to make a config"),
         ));
         let config_filepath = PathBuf::from("test");
         let state = WebState::new(tx, config, config_filepath)
@@ -99,7 +99,7 @@ mod tests {
             .expect("Failed to get state");
         assert_eq!(
             *state.configuration.read().await,
-            Config::new(CliOpts::default()).expect("Failed to make a config")
+            Config::new(CliOpts::test_default()).expect("Failed to make a config")
         );
     }
 }

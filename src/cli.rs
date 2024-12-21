@@ -16,3 +16,12 @@ pub struct CliOpts {
     #[cfg(any(debug_assertions, test))]
     pub oauth2_disable: bool,
 }
+
+impl CliOpts {
+    #[cfg(test)]
+    pub fn test_default() -> Self {
+        let mut opts = Self::default();
+        opts.config = Some(PathBuf::from("files/example-config.json"));
+        opts
+    }
+}
