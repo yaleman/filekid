@@ -161,7 +161,10 @@ mod tests {
         dbg!(&badconfig);
         assert!(badconfig.is_err());
 
-        Config::new(CliOpts::default()).expect("Failed to get config from cli defaults");
+        let mut cliopts = CliOpts::default();
+        cliopts.config = Some(PathBuf::from("files/example-config.json"));
+
+        Config::new(cliopts).expect("Failed to get config from cli defaults (with switched file)");
     }
 
     #[test]
