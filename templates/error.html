@@ -1,0 +1,14 @@
+{% extends "basetemplate.html" %}
+
+{% block nav %}
+{% endblock %}
+
+{% block body %}
+
+<h1>An error occurred!</h1>
+
+<p>{{ error }}</p>
+
+<p>Return to <a href="{{ Urls::Index.as_ref() }}">home</a>.</p>
+
+{% endblock %}

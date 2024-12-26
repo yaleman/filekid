@@ -27,7 +27,9 @@ use tracing::{debug, error, info};
 
 use crate::constants::WEB_SERVER_DEFAULT_STATIC_PATH;
 use crate::oidc::OidcErrorHandler;
-use crate::views::browse::{browse, browse_nopath, get_file, upload_file, upload_nopath};
+use crate::views::browse::{
+    browse, browse_nopath, delete_file_get, delete_file_post, get_file, upload_file, upload_nopath,
+};
 use crate::{views, Config, Error, SendableConfig, WebServerControl, WebState};
 
 pub(crate) async fn handler_404() -> (StatusCode, &'static str) {
@@ -35,23 +37,31 @@ pub(crate) async fn handler_404() -> (StatusCode, &'static str) {
 }
 
 pub(crate) enum Urls {
+    GetFile,
+    Browse,
     Login,
     Logout,
     Index,
     RpLogout,
     HealthCheck,
     Static,
+    Delete,
+    Upload,
 }
 
 impl Urls {
     pub fn as_ref(&self) -> &'static str {
         match self {
+            Urls::GetFile => "/get",
+            Urls::Browse => "/browse",
             Urls::Index => "/",
             Urls::Login => "/login",
             Urls::Logout => "/logout",
             Urls::RpLogout => "/rp_logout",
             Urls::HealthCheck => "/healthy",
             Urls::Static => "/static",
+            Urls::Delete => "/delete",
+            Urls::Upload => "/upload",
         }
     }
 }
@@ -97,16 +107,35 @@ pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
         .layer(OidcLoginLayer::<EmptyAdditionalClaims>::new());
 
     let ui = Router::new()
-        .route("/upload/:server_path/", post(upload_nopath))
-        .route("/upload/:server_path/*filepath", post(upload_file))
+        .route(
+            &format!("{}/:server_path/", Urls::Upload.as_ref()),
+            post(upload_nopath),
+        )
+        .route(
+            &format!("{}/:server_path/*filepath", Urls::Upload.as_ref()),
+            post(upload_file),
+        )
         // TODO: this is pretty janky but it works for now
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(
             state.configuration.read().await.max_upload_mb * 1024 * 1024,
         ))
-        .route("/browse/:server_path/", get(browse_nopath))
-        .route("/browse/:server_path/*filepath", get(browse))
-        .route("/get/:server_path/*filepath", get(get_file))
+        .route(
+            &format!("{}/:server_path/", Urls::Browse.as_ref()),
+            get(browse_nopath),
+        )
+        .route(
+            &format!("{}/:server_path/*filepath", Urls::Browse.as_ref()),
+            get(browse),
+        )
+        .route(
+            Urls::Delete.as_ref(),
+            get(delete_file_get).post(delete_file_post),
+        )
+        .route(
+            &format!("{}/:server_path/*filepath", Urls::GetFile.as_ref()),
+            get(get_file),
+        )
         // after here, the routers don't *require* auth
         .route(Urls::Index.as_ref(), get(views::home));
 

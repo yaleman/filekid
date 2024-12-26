@@ -1,5 +1,7 @@
 //! Error things
 
+use super::web::Urls;
+use askama::Template;
 use askama_axum::IntoResponse;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -39,6 +41,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
+#[derive(Template)]
+#[template(path = "error.html")]
+struct ErrorPage {
+    error: String,
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> askama_axum::Response {
         let statuscode = match self {
@@ -52,7 +60,13 @@ impl IntoResponse for Error {
             Error::InvalidFileType(_) => StatusCode::BAD_REQUEST,
             Error::BadRequest(_) => StatusCode::BAD_REQUEST,
         };
-        (statuscode, format!("{}", self)).into_response()
+        (
+            statuscode,
+            ErrorPage {
+                error: self.to_string(),
+            },
+        )
+            .into_response()
     }
 }
 
@@ -62,7 +76,7 @@ impl Display for Error {
             Error::Generic(e) => write!(f, "Generic error: {}", e),
             Error::Configuration(e) => write!(f, "Configuration error: {}", e),
             Error::Oidc(e) => write!(f, "OIDC error: {}", e),
-            Error::NotFound(e) => write!(f, "Not found: {}", e),
+            Error::NotFound(e) => write!(f, "File/directory not found: {}", e),
             Error::InternalServerError(e) => write!(f, "Internal server error: {}", e),
             Error::Io(e) => write!(f, "IO error: {}", e),
             Error::NotAuthorized(e) => write!(f, "Not authorized: {}", e),

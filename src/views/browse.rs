@@ -3,10 +3,12 @@ use std::fs::DirEntry;
 use std::path::PathBuf;
 
 use axum::body::Bytes;
-use axum::extract::{Multipart, Path};
+use axum::extract::{Multipart, Path, Query};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::HeaderMap;
 use axum::response::Redirect;
+use axum::Form;
+use serde::Deserialize;
 use tracing::{debug, warn};
 
 use crate::fs::{fs_from_serverpath, FileData};
@@ -105,9 +107,19 @@ pub struct FileEntry {
 impl FileEntry {
     pub fn url(&self, server_path: &impl ToString) -> String {
         match self.filetype {
-            FileType::Directory => format!("/browse/{}/{}", server_path.to_string(), self.fullpath),
+            FileType::Directory => format!(
+                "{}/{}/{}",
+                Urls::Browse.as_ref(),
+                server_path.to_string(),
+                self.fullpath
+            ),
 
-            FileType::File => format!("/get/{}/{}", server_path.to_string(), self.fullpath),
+            FileType::File => format!(
+                "{}/{}/{}",
+                Urls::GetFile.as_ref(),
+                server_path.to_string(),
+                self.fullpath
+            ),
         }
     }
 }
@@ -162,7 +174,10 @@ pub(crate) async fn browse(
         .unwrap_or("".into());
 
     if !filekidfs.exists(&target_filepath)? {
-        error!("Couldn't find file path {:?}", target_filepath);
+        warn!(
+            "Couldn't find serverpath={} filepath={:?}",
+            server_path, target_filepath
+        );
         return Err(Error::NotFound(filepath.unwrap_or("".into())));
     }
 
@@ -193,6 +208,7 @@ pub(crate) async fn upload_nopath(
     upload_file(State(state), Path((server_path, None)), multipart).await
 }
 
+#[instrument(level = "debug", skip(state, multipart))]
 pub(crate) async fn upload_file(
     State(state): State<WebState>,
     Path((server_path, filepath)): Path<(String, Option<String>)>,
@@ -274,7 +290,8 @@ pub(crate) async fn upload_file(
         (Some(uploaded_file), Some(uploaded_data)) => {
             filekidfs.put_file(&uploaded_file, &uploaded_data).await?;
             Ok(Redirect::to(&format!(
-                "/browse/{}/{}",
+                "{}/{}/{}",
+                Urls::Browse.as_ref(),
                 server_path,
                 filepath.unwrap_or("".to_string())
             )))
@@ -284,4 +301,74 @@ pub(crate) async fn upload_file(
             Err(Error::BadRequest("No file uploaded".to_string()))
         }
     }
+}
+
+#[derive(Debug, Deserialize, Template)]
+#[template(path = "delete_form.html")]
+pub(crate) struct DeleteForm {
+    filename: String,
+    server_path: String,
+    filepath: String,
+}
+
+pub(crate) async fn delete_file_get(
+    State(state): State<WebState>,
+    Query(query): Query<DeleteForm>,
+) -> Result<DeleteForm, Error> {
+    let server_reader = state.configuration.read().await;
+
+    let server_path_object = match server_reader.server_paths.get(&query.server_path) {
+        None => {
+            error!("Couldn't find server path {}", query.server_path);
+            return Err(Error::NotFound(query.server_path));
+        }
+        Some(p) => p,
+    };
+
+    let filekidfs = fs_from_serverpath(server_path_object)?;
+    if !filekidfs.exists(&query.filepath)? {
+        error!("Couldn't find file path {:?}", query.filepath);
+        return Err(Error::NotFound(query.filepath));
+    }
+
+    Ok(DeleteForm {
+        server_path: query.server_path,
+        filename: query.filename,
+        filepath: query.filepath,
+    })
+}
+
+pub(crate) async fn delete_file_post(
+    State(state): State<WebState>,
+    Form(form): Form<DeleteForm>,
+) -> Result<impl IntoResponse, Error> {
+    let server_reader = state.configuration.read().await;
+
+    let server_path_object = match server_reader.server_paths.get(&form.server_path) {
+        None => {
+            error!("Couldn't find server path {}", form.server_path);
+            return Err(Error::NotFound(form.server_path));
+        }
+        Some(p) => p,
+    };
+
+    let filekidfs = fs_from_serverpath(server_path_object)?;
+
+    if !filekidfs.exists(&form.filepath)? {
+        error!("Couldn't find file path {:?}", form.filepath);
+        return Err(Error::NotFound(form.filepath));
+    }
+
+    filekidfs.delete_file(&FileData {
+        filename: form.filename,
+        filepath: PathBuf::from(&form.filepath),
+        size: None,
+    })?;
+
+    Ok(Redirect::to(&format!(
+        "{}/{}/{}",
+        Urls::Browse.as_ref(),
+        form.server_path,
+        form.filepath
+    )))
 }

@@ -1,0 +1,25 @@
+{% extends "basetemplate.html" %}
+
+{% block nav %}
+<h1>{{ server_path }}/{{ filepath }}</h1>
+{% endblock %}
+
+{% block body %}
+
+<p>Do you really want to delete the following file?</p>
+
+<form method="POST" action="{{Urls::Delete.as_ref()}}>
+    <input type="submit" value="Delete" />
+    <table>
+        <tr>
+            <td>Filename:</td>
+            <td>{{ filename }}</td>
+        </tr>
+        <tr>
+            <td>Server path:</td>
+            <td>{{ server_path }}</td>
+        </td>
+    </tr>
+</table>
+
+{% endblock %}

@@ -98,7 +98,10 @@ impl FileKidFs for TempDir {
             filedata.filepath.clone().to_string_lossy().to_string(),
             filedata.filename.clone(),
         ]
-        .join("/");
+        .join("/")
+        .strip_prefix('/')
+        .map(|s| s.to_string())
+        .unwrap_or_default();
 
         if self.is_in_basepath(&target_path.clone().into())? {
             debug!("{:?}", filedata);
