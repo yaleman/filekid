@@ -77,7 +77,7 @@ impl FileKidFs for TempDir {
         }
     }
 
-    async fn get_file(&self, filedata: FileData) -> Result<tokio::io::Result<Vec<u8>>, Error> {
+    async fn get_file(&self, filedata: FileData) -> Result<Vec<u8>, Error> {
         if !self.is_in_basepath(&filedata.target_file().into())? {
             return Err(Error::NotAuthorized(format!(
                 "Path '{}' is outside of base path",
@@ -85,7 +85,7 @@ impl FileKidFs for TempDir {
             )));
         }
 
-        Ok(tokio::fs::read(&filedata.target_file()).await)
+        Ok(tokio::fs::read(&filedata.target_file()).await?)
     }
 
     #[instrument(level = "debug", skip(self, contents))]
@@ -99,9 +99,8 @@ impl FileKidFs for TempDir {
             filedata.filename.clone(),
         ]
         .join("/");
-        let target_path = target_path.trim_start_matches("/");
 
-        if self.is_in_basepath(&target_path.into())? {
+        if self.is_in_basepath(&target_path.clone().into())? {
             debug!("{:?}", filedata);
             let target_file = self.0.join(&filedata.filepath).join(&filedata.filename);
             debug!("Writing to '{}'", target_file.display());
@@ -158,7 +157,10 @@ impl FileKidFs for TempDir {
 mod tests {
 
     use tempfile::tempdir;
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
 
+    use super::*;
     use crate::fs::FileKidFs;
     use crate::log::setup_logging;
     use crate::views::browse::FileType;
@@ -166,15 +168,12 @@ mod tests {
     #[test]
     fn test_tempdir_get_outside_parent() {
         let tempdir = tempdir().expect("Failed to create tempdir");
-        let tempdir = super::TempDir::new(tempdir.path().into());
+        let tempdir = TempDir::new(tempdir.path().into());
         assert!(tempdir.get_data("/../../../test.txt").is_err());
     }
 
     #[tokio::test]
     async fn test_localfs_name() {
-        use super::*;
-        use tempfile::tempdir;
-
         let temp_dir = tempdir().unwrap();
         let temp_dir_path = temp_dir.path().to_path_buf();
 
@@ -186,18 +185,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_list_dir() {
-        use super::*;
-        use std::fs::File;
-        use std::io::Write;
-        use tempfile::tempdir;
-
         let _ = setup_logging(true, true);
 
         let temp_dir = tempdir().unwrap();
         let temp_dir_path = temp_dir.path().to_path_buf();
 
-        let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
-        file.write_all(b"Hello, world!").unwrap();
+        let mut file = File::create(temp_dir.path().join("test.txt"))
+            .await
+            .expect("Failed to create the test temp file");
+        file.write_all(b"Hello, world!")
+            .await
+            .expect("failed to write to file");
 
         let fs = TempDir::new(temp_dir_path);
 
@@ -232,5 +230,87 @@ mod tests {
         let fs = TempDir::new(temp_dir_path);
 
         assert!(fs.get_data("thiscannotexist.foo").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_file() {
+        use super::*;
+        use std::fs::File;
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
+        file.write_all(b"Hello, world!").unwrap();
+
+        let fs = TempDir::new(temp_dir_path);
+
+        let filedata = fs.get_data("test.txt").unwrap();
+        let contents = fs.get_file(filedata).await.unwrap();
+
+        assert_eq!(contents, b"Hello, world!");
+
+        let filedata = FileData {
+            filename: "test.txt".to_string(),
+            filepath: PathBuf::from("/"),
+            size: None,
+        };
+
+        let result = fs.get_file(filedata).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_put_file() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = TempDir::new(temp_dir_path.clone());
+
+        let filedata = FileData {
+            filename: "test.txt".to_string(),
+            filepath: temp_dir_path,
+            size: None,
+        };
+
+        let contents = b"Hello, world!";
+
+        let res = fs.put_file(&filedata, contents).await;
+        assert!(res.is_ok());
+
+        let res = fs.get_data("test.txt");
+        assert!(res.is_ok());
+        let filedata = res.unwrap();
+        assert_eq!(filedata.size, Some(13));
+
+        let res = fs.get_file(filedata).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), contents);
+
+        // test putting a file outside the base path
+        let outside_filedata = FileData {
+            filename: "test.txt".to_string(),
+            filepath: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("No parent for current dir")
+                .parent()
+                .expect("No parent for parent dir")
+                .canonicalize()
+                .expect("Can't access directory above Project dir"),
+            size: None,
+        };
+
+        let outside_res = fs.put_file(&outside_filedata, contents).await;
+
+        assert!(outside_res.is_err());
     }
 }

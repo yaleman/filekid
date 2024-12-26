@@ -46,6 +46,8 @@ pub struct ServerPath {
 pub enum WebMessage {
     Shutdown,
 }
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum WebServerControl {
     Stop,
     StopAfter(u64),

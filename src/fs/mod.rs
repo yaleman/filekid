@@ -41,7 +41,7 @@ where
 
     fn get_data(&self, path: &str) -> Result<FileData, Error>;
 
-    async fn get_file(&self, filedata: FileData) -> Result<tokio::io::Result<Vec<u8>>, Error>;
+    async fn get_file(&self, filedata: FileData) -> Result<Vec<u8>, Error>;
 
     async fn put_file(&self, filedata: &FileData, contents: &[u8]) -> Result<(), Error>;
 
@@ -75,5 +75,52 @@ pub fn fs_from_serverpath(server_path: &ServerPath) -> Result<Box<dyn FileKidFs>
             )),
             Some(path) => Ok(Box::new(tempdir::TempDir::new(path.to_owned()))),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fs_from_serverpath_local() {
+        let server_path = ServerPath {
+            type_: FileKidFsType::Local,
+            path: Some(PathBuf::from("/some/local/path")),
+        };
+        let fs = fs_from_serverpath(&server_path);
+        assert!(fs.is_ok());
+        assert_eq!(fs.unwrap().name(), "local:/some/local/path");
+    }
+
+    #[test]
+    fn test_fs_from_serverpath_tempdir() {
+        let server_path = ServerPath {
+            type_: FileKidFsType::TempDir,
+            path: Some(PathBuf::from("/some/tempdir/path")),
+        };
+        let fs = fs_from_serverpath(&server_path);
+        assert!(fs.is_ok());
+        assert_eq!(fs.unwrap().name(), "tempdir (/some/tempdir/path)");
+    }
+
+    #[test]
+    fn test_fs_from_serverpath_local_no_path() {
+        let server_path = ServerPath {
+            type_: FileKidFsType::Local,
+            path: None,
+        };
+        let fs = fs_from_serverpath(&server_path);
+        assert!(fs.is_err());
+    }
+
+    #[test]
+    fn test_fs_from_serverpath_tempdir_no_path() {
+        let server_path = ServerPath {
+            type_: FileKidFsType::TempDir,
+            path: None,
+        };
+        let fs = fs_from_serverpath(&server_path);
+        assert!(fs.is_err());
     }
 }

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use axum::body::Bytes;
 use axum::extract::{Multipart, Path};
+use axum::http::header::CONTENT_TYPE;
 use axum::http::HeaderMap;
 use axum::response::Redirect;
 use tracing::{debug, warn};
@@ -41,7 +42,7 @@ pub(crate) async fn get_file(
         .to_string();
     let mut headers = HeaderMap::new();
     headers.insert(
-        "Content-Type",
+        CONTENT_TYPE,
         mime_type.parse().map_err(|err| {
             error!(
                 "Failed to parse mime type for file {:?} -> {}: {}",
@@ -53,11 +54,7 @@ pub(crate) async fn get_file(
             ))
         })?,
     );
-    Ok((
-        StatusCode::OK,
-        headers,
-        filekidfs.get_file(metadata).await??,
-    ))
+    Ok((StatusCode::OK, headers, filekidfs.get_file(metadata).await?))
 }
 
 #[derive(Template)]

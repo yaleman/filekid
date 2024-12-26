@@ -67,6 +67,7 @@ impl FileKidFs for LocalFs {
 
         let filename = actual_filepath
             .file_name()
+            // this shouldn't trigger because we just checked the file exists
             .ok_or_else(|| Error::NotFound("File not found".to_string()))?;
 
         Ok(FileData {
@@ -75,19 +76,20 @@ impl FileKidFs for LocalFs {
                 .parent()
                 .unwrap_or(&self.base_path)
                 .to_path_buf(),
+            // this shouldn't trigger because we just checked the file exists, but we might not be able to read it
             size: actual_filepath.metadata().ok().map(|m| m.len()),
         })
     }
 
     #[instrument(level = "debug", skip(self))]
-    async fn get_file(&self, filedata: FileData) -> Result<tokio::io::Result<Vec<u8>>, Error> {
+    async fn get_file(&self, filedata: FileData) -> Result<Vec<u8>, Error> {
         if !self.is_in_basepath(&filedata.target_file().into())? {
             return Err(Error::NotAuthorized(
                 "Path is outside of base path".to_string(),
             ));
         }
 
-        Ok(tokio::fs::read(filedata.target_file()).await)
+        Ok(tokio::fs::read(filedata.target_file()).await?)
     }
 
     #[instrument(level = "debug", skip(contents, self))]
@@ -203,6 +205,7 @@ impl FileKidFs for LocalFs {
 
 #[cfg(test)]
 mod tests {
+
     use crate::log::setup_logging;
 
     #[tokio::test]
@@ -220,7 +223,7 @@ mod tests {
         assert!(fs.name().contains(&temp_dir_path.display().to_string()));
     }
     #[tokio::test]
-    async fn test_list_dir() {
+    async fn test_list_dir2() {
         use super::*;
         use std::fs::File;
         use std::io::Write;
@@ -265,6 +268,117 @@ mod tests {
 
         dbg!(&res);
 
+        assert!(res.is_err());
+    }
+    #[tokio::test]
+    async fn test_get_file() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = LocalFs::new(temp_dir_path.clone());
+
+        let error_filedata = FileData {
+            filename: "thiscannotexist.foo".to_string(),
+            filepath: temp_dir_path.clone(),
+            size: None,
+        };
+
+        let error_res = fs.get_file(error_filedata);
+        assert!(error_res.await.is_err());
+
+        // test outside the base path
+        let error_filedata = FileData {
+            filename: "thiscannotexist.foo".to_string(),
+            filepath: PathBuf::from("/etc"),
+            size: None,
+        };
+        let error_res = fs.get_file(error_filedata).await;
+        assert!(error_res.is_err());
+        assert_eq!(
+            error_res,
+            Err(Error::NotAuthorized(
+                "Path is outside of base path".to_string(),
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_put_file() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = LocalFs::new(temp_dir_path.clone());
+
+        let filedata = FileData {
+            filename: "test.txt".to_string(),
+            filepath: temp_dir_path,
+            size: None,
+        };
+
+        let contents = b"Hello, world!";
+
+        let res = fs.put_file(&filedata, contents).await;
+        assert!(res.is_ok());
+
+        let res = fs.get_data("test.txt");
+        assert!(res.is_ok());
+        let filedata = res.unwrap();
+        assert_eq!(filedata.size, Some(13));
+
+        let res = fs.get_file(filedata).await;
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), contents);
+
+        // test putting a file outside the base path
+        let outside_filedata = FileData {
+            filename: "test.txt".to_string(),
+            filepath: PathBuf::from("/etc"),
+            size: None,
+        };
+
+        let outside_res = fs.put_file(&outside_filedata, contents).await;
+        assert!(outside_res.is_err());
+        assert_eq!(
+            outside_res,
+            Err(Error::NotAuthorized(
+                "Path is outside of base path".to_string(),
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_dir() {
+        use super::*;
+        use tempfile::tempdir;
+
+        let _ = setup_logging(true, true);
+
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_path_buf();
+
+        let fs = LocalFs::new(temp_dir_path.clone());
+
+        let res = fs.list_dir(None);
+        assert!(res.is_ok());
+        let entries = res.unwrap();
+        assert_eq!(entries.len(), 0);
+
+        let res = fs.list_dir(Some(".".to_string()));
+        assert!(res.is_ok());
+        let entries = res.unwrap();
+        assert_eq!(entries.len(), 0);
+
+        let res = fs.list_dir(Some("thiscannotexist.foo".to_string()));
         assert!(res.is_err());
     }
 }
