@@ -118,7 +118,7 @@ mod tests {
         );
 
         let e = Error::NotFound("not found".to_string());
-        assert_eq!(format!("{}", e), "Not found: not found");
+        assert_eq!(format!("{}", e), "File/directory not found: not found");
         assert_eq!(e.clone().into_response().status(), StatusCode::NOT_FOUND);
 
         let e = Error::InternalServerError("internal error".to_string());
