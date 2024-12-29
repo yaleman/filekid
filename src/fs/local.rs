@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use axum::body::Body;
 use tracing::{debug, error, instrument};
 
 use crate::error::Error;
@@ -33,6 +34,10 @@ impl LocalFs {
 impl FileKidFs for LocalFs {
     fn name(&self) -> String {
         format!("local:{}", self.base_path.display())
+    }
+
+    fn has_stream_put_file(&self) -> bool {
+        true
     }
 
     fn available(&self) -> Result<bool, Error> {
@@ -82,22 +87,26 @@ impl FileKidFs for LocalFs {
     }
 
     #[instrument(level = "debug", skip(self))]
-    async fn get_file(&self, filedata: FileData) -> Result<Vec<u8>, Error> {
-        if !self.is_in_basepath(&filedata.target_file().into())? {
+    async fn get_file(&self, filepath: &str) -> Result<Vec<u8>, Error> {
+        let target_path = self.target_path_from_key(filepath);
+
+        if !self.is_in_basepath(&filepath.into())? {
             return Err(Error::NotAuthorized(
                 "Path is outside of base path".to_string(),
             ));
         }
 
-        Ok(tokio::fs::read(filedata.target_file()).await?)
+        Ok(tokio::fs::read(target_path).await?)
+    }
+
+    #[instrument(level = "debug", skip(self))]
+    async fn read_file(&self, filepath: &str) -> Result<Body, Error> {
+        todo!()
     }
 
     #[instrument(level = "debug", skip(contents, self))]
-    async fn put_file(&self, filedata: &super::FileData, contents: &[u8]) -> Result<(), Error> {
-        let target_file = self
-            .base_path
-            .join(&filedata.filepath)
-            .join(&filedata.filename);
+    async fn put_file(&self, filepath: &str, contents: &[u8]) -> Result<(), Error> {
+        let target_file = self.target_path_from_key(filepath);
 
         if !self.is_in_basepath(&target_file)? {
             return Err(Error::NotAuthorized(
@@ -111,10 +120,13 @@ impl FileKidFs for LocalFs {
             .map_err(Error::from)
     }
 
-    #[instrument(level = "debug", skip(self))]
-    fn delete_file(&self, filedata: &super::FileData) -> Result<(), Error> {
-        let target_file = self.base_path.join(&filedata.filepath);
+    fn target_path_from_key(&self, key: &str) -> PathBuf {
+        self.base_path.join(key)
+    }
 
+    #[instrument(level = "debug", skip(self))]
+    fn delete_file(&self, filepath: &str) -> Result<(), Error> {
+        let target_file = self.base_path.join(filepath);
         if !self.is_in_basepath(&target_file)? {
             return Err(Error::NotAuthorized(
                 "Path is outside of base path".to_string(),
@@ -127,7 +139,8 @@ impl FileKidFs for LocalFs {
     fn list_dir(&self, path: Option<String>) -> Result<Vec<FileEntry>, Error> {
         let path_addition = path.clone().unwrap_or_default();
 
-        let target_path = self.base_path.join(&path_addition);
+        let target_path = self.target_path_from_key(&path_addition);
+
         if !self.is_in_basepath(&target_path)? {
             return Err(Error::NotAuthorized(
                 "Path is outside of base path".to_string(),
@@ -282,22 +295,10 @@ mod tests {
 
         let fs = LocalFs::new(temp_dir_path.clone());
 
-        let error_filedata = FileData {
-            filename: "thiscannotexist.foo".to_string(),
-            filepath: temp_dir_path.clone(),
-            size: None,
-        };
-
-        let error_res = fs.get_file(error_filedata);
+        let error_res = fs.get_file("thiscannotexist.foo");
         assert!(error_res.await.is_err());
 
-        // test outside the base path
-        let error_filedata = FileData {
-            filename: "thiscannotexist.foo".to_string(),
-            filepath: PathBuf::from("/etc"),
-            size: None,
-        };
-        let error_res = fs.get_file(error_filedata).await;
+        let error_res = fs.get_file("/etc/thiscannotexist.foo").await;
         assert!(error_res.is_err());
         assert_eq!(
             error_res,
@@ -319,15 +320,9 @@ mod tests {
 
         let fs = LocalFs::new(temp_dir_path.clone());
 
-        let filedata = FileData {
-            filename: "test.txt".to_string(),
-            filepath: temp_dir_path,
-            size: None,
-        };
-
         let contents = b"Hello, world!";
 
-        let res = fs.put_file(&filedata, contents).await;
+        let res = fs.put_file("test.txt", contents).await;
         assert!(res.is_ok());
 
         let res = fs.get_data("test.txt");
@@ -335,18 +330,12 @@ mod tests {
         let filedata = res.unwrap();
         assert_eq!(filedata.size, Some(13));
 
-        let res = fs.get_file(filedata).await;
+        let res = fs.get_file("test.txt").await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), contents);
 
         // test putting a file outside the base path
-        let outside_filedata = FileData {
-            filename: "test.txt".to_string(),
-            filepath: PathBuf::from("/etc"),
-            size: None,
-        };
-
-        let outside_res = fs.put_file(&outside_filedata, contents).await;
+        let outside_res = fs.put_file("/etc/test.txt", contents).await;
         assert!(outside_res.is_err());
         assert_eq!(
             outside_res,

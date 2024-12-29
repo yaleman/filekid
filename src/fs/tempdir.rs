@@ -7,7 +7,7 @@ use tracing::*;
 use crate::error::Error;
 use crate::views::browse::FileEntry;
 
-use super::{FileData, FileKidFs};
+use super::FileKidFs;
 
 #[derive(Debug)]
 pub(crate) struct TempDir(PathBuf);
@@ -19,8 +19,19 @@ impl TempDir {
 
     /// Ensure that the thing we're looking at is in a "safe" path
     #[instrument(level = "debug", skip(self))]
-    fn is_in_basepath(&self, filename: &PathBuf) -> Result<bool, Error> {
-        Ok(self.0.join(filename).ancestors().any(|path| path == self.0))
+    fn is_in_basepath(&self, key: &str) -> Result<bool, Error> {
+        Ok(self.target_path_from_key(key).ancestors().any(|path| {
+            if path == self.0 {
+                debug!(
+                    "filename: {} matches parent path {} (key={})",
+                    key,
+                    path.display(),
+                    self.target_path_from_key(key).display()
+                );
+                return true;
+            }
+            false
+        }))
     }
 }
 
@@ -28,6 +39,10 @@ impl TempDir {
 impl FileKidFs for TempDir {
     fn name(&self) -> String {
         format!("tempdir ({})", self.0.display())
+    }
+
+    fn target_path_from_key(&self, key: &str) -> PathBuf {
+        self.0.join(key)
     }
 
     fn available(&self) -> Result<bool, crate::error::Error> {
@@ -41,20 +56,12 @@ impl FileKidFs for TempDir {
             return Ok(true);
         }
 
-        let target_file = self.0.join(filepath);
-
-        debug!(
-            "Checking if {} exists under base path {}",
-            target_file.display(),
-            self.0.display()
-        );
-
-        Ok(target_file.exists() && self.is_in_basepath(&PathBuf::from(filepath))?)
+        Ok(self.target_path_from_key(filepath).exists() && self.is_in_basepath(filepath)?)
     }
 
     #[instrument(level = "debug", skip(self))]
     fn get_data(&self, path: &str) -> Result<super::FileData, crate::error::Error> {
-        let target = self.0.join(path);
+        let target = self.target_path_from_key(path);
 
         debug!(
             "Checking if {} is in base path {}",
@@ -62,7 +69,7 @@ impl FileKidFs for TempDir {
             self.0.display()
         );
 
-        self.is_in_basepath(&path.into())?;
+        self.is_in_basepath(path)?;
 
         if let Some(filename) = target.file_name() {
             Ok(super::FileData {
@@ -77,49 +84,39 @@ impl FileKidFs for TempDir {
         }
     }
 
-    async fn get_file(&self, filedata: FileData) -> Result<Vec<u8>, Error> {
-        if !self.is_in_basepath(&filedata.target_file().into())? {
+    async fn get_file(&self, filepath: &str) -> Result<Vec<u8>, Error> {
+        if !self.is_in_basepath(filepath)? {
             return Err(Error::NotAuthorized(format!(
                 "Path '{}' is outside of base path",
-                &filedata.target_file()
+                &filepath
             )));
         }
 
-        Ok(tokio::fs::read(&filedata.target_file()).await?)
+        Ok(tokio::fs::read(&self.target_path_from_key(filepath)).await?)
+    }
+
+    #[instrument(level = "debug", skip(self))]
+    async fn read_file(&self, _filepath: &str) -> Result<axum::body::Body, Error> {
+        todo!("read_file hasn't beem implemented for TempDir yet");
     }
 
     #[instrument(level = "debug", skip(self, contents))]
-    async fn put_file(
-        &self,
-        filedata: &super::FileData,
-        contents: &[u8],
-    ) -> Result<(), crate::error::Error> {
-        let target_path = [
-            filedata.filepath.clone().to_string_lossy().to_string(),
-            filedata.filename.clone(),
-        ]
-        .join("/")
-        .strip_prefix('/')
-        .map(|s| s.to_string())
-        .unwrap_or_default();
-
-        if self.is_in_basepath(&target_path.clone().into())? {
-            debug!("{:?}", filedata);
-            let target_file = self.0.join(&filedata.filepath).join(&filedata.filename);
-            debug!("Writing to '{}'", target_file.display());
-
-            tokio::fs::write(target_file, contents).await?;
+    async fn put_file(&self, filepath: &str, contents: &[u8]) -> Result<(), crate::error::Error> {
+        if self.is_in_basepath(filepath)? {
+            let target_path = self.target_path_from_key(filepath);
+            debug!("Writing to '{}'", target_path.display());
+            tokio::fs::write(target_path, contents).await?;
             Ok(())
         } else {
             Err(crate::error::Error::NotAuthorized(format!(
                 "Path {} is outside of parent path",
-                target_path
+                filepath
             )))
         }
     }
 
     #[instrument(level = "debug", skip(self))]
-    fn delete_file(&self, _filedata: &super::FileData) -> Result<(), crate::error::Error> {
+    fn delete_file(&self, filepath: &str) -> Result<(), crate::error::Error> {
         todo!("tempdir delete file functionality")
     }
 
@@ -252,18 +249,10 @@ mod tests {
 
         let fs = TempDir::new(temp_dir_path);
 
-        let filedata = fs.get_data("test.txt").unwrap();
-        let contents = fs.get_file(filedata).await.unwrap();
-
+        let contents = fs.get_file("test.txt").await.unwrap();
         assert_eq!(contents, b"Hello, world!");
 
-        let filedata = FileData {
-            filename: "test.txt".to_string(),
-            filepath: PathBuf::from("/"),
-            size: None,
-        };
-
-        let result = fs.get_file(filedata).await;
+        let result = fs.get_file("canotgtsdaftest.txt").await;
         assert!(result.is_err());
     }
 
@@ -279,40 +268,33 @@ mod tests {
 
         let fs = TempDir::new(temp_dir_path.clone());
 
-        let filedata = FileData {
-            filename: "test.txt".to_string(),
-            filepath: temp_dir_path,
-            size: None,
-        };
-
+        let filename = "test.txt";
         let contents = b"Hello, world!";
 
-        let res = fs.put_file(&filedata, contents).await;
+        let res = fs.put_file(filename, contents).await;
         assert!(res.is_ok());
 
-        let res = fs.get_data("test.txt");
+        let res = fs.get_data(filename);
         assert!(res.is_ok());
         let filedata = res.unwrap();
         assert_eq!(filedata.size, Some(13));
 
-        let res = fs.get_file(filedata).await;
+        let res = fs.get_file(filename).await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), contents);
 
         // test putting a file outside the base path
-        let outside_filedata = FileData {
-            filename: "test.txt".to_string(),
-            filepath: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .expect("No parent for current dir")
-                .parent()
-                .expect("No parent for parent dir")
-                .canonicalize()
-                .expect("Can't access directory above Project dir"),
-            size: None,
-        };
+        let outside_target_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("No parent for current dir")
+            .parent()
+            .expect("No parent for parent dir")
+            .canonicalize()
+            .expect("Can't access directory above Project dir");
+        dbg!(&fs);
+        dbg!(&outside_target_path);
 
-        let outside_res = fs.put_file(&outside_filedata, contents).await;
+        let outside_res = fs.put_file("../../../etc/foo.txt", contents).await;
 
         assert!(outside_res.is_err());
     }

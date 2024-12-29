@@ -11,7 +11,7 @@ use axum::Form;
 use serde::Deserialize;
 use tracing::{debug, warn};
 
-use crate::fs::{fs_from_serverpath, FileData};
+use crate::fs::fs_from_serverpath;
 
 use super::prelude::*;
 
@@ -37,8 +37,6 @@ pub(crate) async fn get_file(
         return Err(Error::NotFound(filepath.to_string()));
     }
 
-    let metadata = filekidfs.get_data(&filepath)?;
-
     let mime_type = mime_guess::from_path(&filepath)
         .first_or_octet_stream()
         .to_string();
@@ -56,7 +54,11 @@ pub(crate) async fn get_file(
             ))
         })?,
     );
-    Ok((StatusCode::OK, headers, filekidfs.get_file(metadata).await?))
+    Ok((
+        StatusCode::OK,
+        headers,
+        filekidfs.get_file(&filepath).await?,
+    ))
 }
 
 #[derive(Template)]
@@ -226,7 +228,7 @@ pub(crate) async fn upload_file(
 
     let filekidfs = fs_from_serverpath(server_path_object)?;
 
-    let mut uploaded_file: Option<FileData> = None;
+    let mut uploaded_filename: Option<String> = None;
     let mut uploaded_data: Option<Bytes> = None;
     // let mut overwrite: bool = false;
 
@@ -272,11 +274,7 @@ pub(crate) async fn upload_file(
                     data.len()
                 );
 
-                uploaded_file = Some(FileData {
-                    filepath: stripped_filepath.clone().into(),
-                    filename: file_name,
-                    size: Some(data.len() as u64),
-                });
+                uploaded_filename = Some(stripped_filepath.clone());
                 uploaded_data = Some(data);
             } else if field_name == "overwrite" {
                 // overwrite = true;
@@ -286,14 +284,18 @@ pub(crate) async fn upload_file(
     }
 
     // have we got a file?
-    match (uploaded_file, uploaded_data) {
+    match (uploaded_filename, uploaded_data) {
         (Some(uploaded_file), Some(uploaded_data)) => {
+            let filepath = filepath.unwrap_or("".to_string());
+
+            filekidfs.target_path(&filepath, &uploaded_file);
+
             filekidfs.put_file(&uploaded_file, &uploaded_data).await?;
             Ok(Redirect::to(&format!(
                 "{}/{}/{}",
                 Urls::Browse.as_ref(),
                 server_path,
-                filepath.unwrap_or("".to_string())
+                filepath
             )))
         }
         _ => {
@@ -359,11 +361,9 @@ pub(crate) async fn delete_file_post(
         return Err(Error::NotFound(form.filepath));
     }
 
-    filekidfs.delete_file(&FileData {
-        filename: form.filename,
-        filepath: PathBuf::from(&form.filepath),
-        size: None,
-    })?;
+    let target_file = filekidfs.target_path(&form.filepath, &form.filename);
+
+    filekidfs.delete_file(&target_file)?;
 
     Ok(Redirect::to(&format!(
         "{}/{}/{}",
