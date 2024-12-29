@@ -52,11 +52,14 @@ where
     /// Checks if it's online/available - for S3 this would be checking if the bucket exists, local filesystem would be checking if the path exists
     fn available(&self) -> Result<bool, Error>;
 
-    fn target_path(&self, filepath: &str, filename: &str) -> String {
+    fn target_path(&self, filepath: &str, filename: &str) -> Result<String, Error> {
+        if filename.is_empty() {
+            return Err(Error::BadRequest("Filename is empty".to_string()));
+        }
         if filepath.trim().strip_prefix('/').unwrap_or("").is_empty() {
-            filename.to_string()
+            Ok(filename.to_string())
         } else {
-            format!("{}/{}", filepath, filename)
+            Ok(format!("{}/{}", filepath, filename))
         }
     }
     fn target_path_from_key(&self, key: &str) -> PathBuf;

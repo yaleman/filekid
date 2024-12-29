@@ -267,14 +267,9 @@ pub(crate) async fn upload_file(
                     Error::InternalServerError("Failed to read file data".to_string())
                 })?;
 
-                debug!(
-                    "Length of `{}`) is {} bytes",
-                    file_name,
-                    // content_type,
-                    data.len()
-                );
+                debug!("Length of `{}` is {} bytes", file_name, data.len());
 
-                uploaded_filename = Some(stripped_filepath.clone());
+                uploaded_filename = Some(file_name);
                 uploaded_data = Some(data);
             } else if field_name == "overwrite" {
                 // overwrite = true;
@@ -288,9 +283,12 @@ pub(crate) async fn upload_file(
         (Some(uploaded_file), Some(uploaded_data)) => {
             let filepath = filepath.unwrap_or("".to_string());
 
-            filekidfs.target_path(&filepath, &uploaded_file);
-
-            filekidfs.put_file(&uploaded_file, &uploaded_data).await?;
+            filekidfs
+                .put_file(
+                    &filekidfs.target_path(&filepath, &uploaded_file)?,
+                    &uploaded_data,
+                )
+                .await?;
             Ok(Redirect::to(&format!(
                 "{}/{}/{}",
                 Urls::Browse.as_ref(),
@@ -361,7 +359,7 @@ pub(crate) async fn delete_file_post(
         return Err(Error::NotFound(form.filepath));
     }
 
-    let target_file = filekidfs.target_path(&form.filepath, &form.filename);
+    let target_file = filekidfs.target_path(&form.filepath, &form.filename)?;
 
     filekidfs.delete_file(&target_file)?;
 
