@@ -25,7 +25,7 @@ pub(crate) async fn home(State(state): State<WebState>) -> Result<HomePage, Erro
         .clone()
         .into_iter()
         .collect::<Vec<(String, ServerPath)>>();
-    server_paths.sort_by(|(a, _), (b, _)| a.cmp(&b));
+    server_paths.sort_by(|(a, _), (b, _)| a.cmp(b));
 
     Ok(HomePage { server_paths })
 }

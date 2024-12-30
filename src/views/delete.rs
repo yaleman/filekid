@@ -18,7 +18,7 @@ pub(crate) struct DeleteForm {
 impl DeleteForm {
     fn parent_path(&self) -> String {
         let path = self.key.clone();
-        let mut path = path.split('/').into_iter().collect::<Vec<&str>>();
+        let mut path = path.split('/').collect::<Vec<&str>>();
         path.pop();
         path.join("/")
     }
