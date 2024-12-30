@@ -1,32 +1,64 @@
-{% extends "basetemplate.html" %}
-
-{% block nav %}
+{% extends "basetemplate.html" %} {% block nav %}
 <h1>{{ server_path }}/{{ current_path }}</h1>
-{% endblock %}
+{% endblock %} {% block body %}
 
-{% block body %}
-
-<form method="POST"
-  action="/upload/{{ server_path }}/{{ parent_path }}"
-  enctype="multipart/form-data">
-  <label name="file_label"></label><input aria-labelledby="file_label"
-    type="file" name="file" />
+<form
+  method="POST"
+  action="{{ Urls::Upload.as_ref() }}/{{ server_path }}/{{ parent_path }}"
+  enctype="multipart/form-data"
+>
+  <label name="file_label"></label><input
+    aria-labelledby="file_label"
+    type="file"
+    name="file"
+  />
   <input type="submit" value="Upload" />
 </form>
 
-<ul class="filelist">
+<table class="filelist fullwidth">
   {% if !parent_path.is_empty() %}
-  <li><a href="/browse/{{server_path}}/{{ parent_path }}"><img
-        src="/static/folder.svg" class="fileicon" />..</a></li>
+  <tr>
+    <td>
+      <a href="{{ Urls::Browse.as_ref() }}/{{server_path}}/{{ parent_path }}">
+        <img
+          src="{{ Urls::Static.as_ref() }}/folder.svg"
+          class="fileicon"
+        />..</a>
+    </td>
+    <td class="filelist-buttons">&nbsp;</td>
+  </tr>
   {% else %}
-  <li><a href="/"><img src="/static/folder.svg" class="fileicon" />Home</a></li>
-  {% endif %}
-
-  {% for entry in entries %}
-  <li><a href="{{ entry.url(server_path) }}"><img
-        src="/static/{{entry.filetype.icon()}}" class="fileicon" />
-      {{ entry.filename }}</a> <a
-      href="{{Urls::Delete.as_ref()}}?server_path={{server_path}}&filepath={{entry.fullpath}}&filename={{entry.filename}}">[D]</a></li>
+  <tr>
+    <td>
+      <a href="{{ Urls::Index.as_ref() }}">
+        <img
+          src="{{ Urls::Static.as_ref() }}/folder.svg"
+          class="fileicon"
+        />Home</a>
+    </td>
+    <td class="filelist-buttons">&nbsp;</td>
+  </tr>
+  {% endif %} {% for entry in entries %}
+  <tr>
+    <td>
+      <a href="{{ entry.url(server_path) }}">
+        <img
+          src="{{ Urls::Static.as_ref() }}/{{entry.filetype.icon()}}"
+          class="fileicon"
+        />
+        {{ entry.filename }}</a>
+    </td>
+    <td class="filelist-buttons">
+      <a
+        class="button"
+        href="{{ Urls::Delete.as_ref() }}?server_path={{server_path}}&key={{entry.fullpath}}"
+      >
+        <img
+          src="{{ Urls::Static.as_ref() }}/trash-can-white.svg"
+          class="fileicon"
+        /></a>
+    </td>
+  </tr>
   {% endfor %}
-</ul>
+</table>
 {% endblock %}

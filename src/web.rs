@@ -27,9 +27,8 @@ use tracing::{debug, error, info};
 
 use crate::constants::WEB_SERVER_DEFAULT_STATIC_PATH;
 use crate::oidc::OidcErrorHandler;
-use crate::views::browse::{
-    browse, browse_nopath, delete_file_get, delete_file_post, get_file, upload_file, upload_nopath,
-};
+use crate::views::browse::{browse, browse_nopath, get_file, upload_file, upload_nopath};
+use crate::views::delete::{delete_file_get, delete_file_post};
 use crate::{views, Config, Error, SendableConfig, WebServerControl, WebState};
 
 pub(crate) async fn handler_404() -> (StatusCode, &'static str) {

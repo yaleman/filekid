@@ -63,13 +63,15 @@ where
         }
     }
     fn target_path_from_key(&self, key: &str) -> PathBuf;
+
+    fn is_file(&self, key: &str) -> bool;
+    fn is_dir(&self, key: &str) -> bool;
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum FileKidFsType {
     Local,
-    // S3(s3::S3Fs),
     TempDir,
 }
 
