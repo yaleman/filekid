@@ -1,10 +1,12 @@
-{% extends "basetemplate.html" %}
-
-{% block body %}
+{% extends "basetemplate.html" %} {% block body %}
 <ul class="filelist">
     {% for (server, server_config) in server_paths %}
-    <li><a href="/browse/{{server}}/"><img src="/static/folder.svg"
-                class="fileicon" /> {{server}}</a></li>
+    <li>
+        <a href="{{ Urls::Browse.as_ref() }}/{{server}}/"><img
+                src="{{ Urls::Static.as_ref() }}/folder.svg"
+                class="fileicon"
+            /> {{server}}</a>
+    </li>
     {% endfor %}
 </ul>
 {% endblock %}

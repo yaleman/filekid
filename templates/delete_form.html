@@ -1,25 +1,31 @@
-{% extends "basetemplate.html" %}
-
-{% block nav %}
-<h1>{{ server_path }}/{{ filepath }}</h1>
-{% endblock %}
-
-{% block body %}
+{% extends "basetemplate.html" %} {% block nav %}
+<h2>Delete confirmation</h2>
+{% endblock %} {% block body %}
 
 <p>Do you really want to delete the following file?</p>
 
-<form method="POST" action="{{Urls::Delete.as_ref()}}>
-    <input type="submit" value="Delete" />
-    <table>
+<form method="POST" action="{{ Urls::Delete.as_ref() }}">
+    <input type="hidden" name="key" value="{{ key }}" />
+    <input type="hidden" name="server_path" value="{{ server_path }}" />
+
+    <table class="fullwidth">
         <tr>
-            <td>Filename:</td>
-            <td>{{ filename }}</td>
+            <td>File path:</td>
+            <td>{{ key }}</td>
         </tr>
         <tr>
-            <td>Server path:</td>
+            <td>Server:</td>
             <td>{{ server_path }}</td>
-        </td>
-    </tr>
-</table>
-
+        </tr>
+        <tr>
+            <td><input type="submit" name="confirm" value="Yes!" /></td>
+            <td>
+                <a
+                    href="{{ Urls::Browse.as_ref() }}/{{server_path}}/{{ self.parent_path() }}"
+                    class="button"
+                >No!</a>
+            </td>
+        </tr>
+    </table>
+</form>
 {% endblock %}

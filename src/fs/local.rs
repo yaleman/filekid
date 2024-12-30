@@ -6,7 +6,7 @@ use axum::body::Body;
 use tracing::{debug, error, instrument};
 
 use crate::error::Error;
-use crate::views::browse::FileType;
+use crate::views::FileType;
 
 use super::{FileData, FileEntry, FileKidFs};
 
@@ -213,6 +213,13 @@ impl FileKidFs for LocalFs {
                     })
             })
             .collect()
+    }
+
+    fn is_file(&self, _key: &str) -> bool {
+        todo!()
+    }
+    fn is_dir(&self, _key: &str) -> bool {
+        todo!()
     }
 }
 

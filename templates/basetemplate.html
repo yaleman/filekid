@@ -4,12 +4,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/static/simple.min.css" />
-    <link rel="stylesheet" href="/static/filekid.css" />
+    <link rel="stylesheet" href="{{ Urls::Static.as_ref() }}/simple.min.css" />
+    <link rel="stylesheet" href="{{ Urls::Static.as_ref() }}/filekid.css" />
   </head>
   <body>
   <header>
-    <h1><a href="/">FileKid</a></h1>
+    <h1><a href="{{ Urls::Index.as_ref() }}">FileKid</a></h1>
     {% block nav %} {% endblock %}
   </header>
   <main>

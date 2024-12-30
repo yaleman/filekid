@@ -1,21 +1,15 @@
 //! This module contains the browse endpoint, which allows users to browse the files on the server.
 use std::fs::DirEntry;
-use std::path::PathBuf;
 
 use axum::body::Bytes;
-use axum::extract::{Multipart, Path, Query};
+use axum::extract::{Multipart, Path};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::HeaderMap;
 use axum::response::Redirect;
-use axum::Form;
-use serde::Deserialize;
 use tracing::{debug, warn};
 
+use super::{prelude::*, FileType};
 use crate::fs::fs_from_serverpath;
-
-use super::prelude::*;
-
-// use crate::{prelude::*, FileKid};
 
 pub(crate) async fn get_file(
     State(state): State<WebState>,
@@ -68,35 +62,6 @@ pub(crate) struct BrowsePage {
     entries: Vec<FileEntry>,
     parent_path: String,
     current_path: String,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum FileType {
-    Directory,
-    File,
-}
-
-impl FileType {
-    pub fn icon(&self) -> &'static str {
-        match self {
-            FileType::Directory => "folder.svg",
-            FileType::File => "file.svg",
-        }
-    }
-}
-
-impl TryFrom<&PathBuf> for FileType {
-    type Error = Error;
-
-    fn try_from(value: &PathBuf) -> Result<Self, Self::Error> {
-        if value.is_file() {
-            Ok(Self::File)
-        } else if value.is_dir() {
-            Ok(Self::Directory)
-        } else {
-            Err(Error::InvalidFileType(value.display().to_string()))
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -192,7 +157,12 @@ pub(crate) async fn browse(
         None => "".to_string(),
     };
 
-    let entries: Vec<FileEntry> = filekidfs.list_dir(filepath.clone())?;
+    let mut entries: Vec<FileEntry> = filekidfs.list_dir(filepath.clone())?;
+    // sort by filename
+    entries.sort_by(|a, b| a.filename.cmp(&b.filename));
+    // sort by type to put directories first
+    entries.sort_by(|a, b| a.filetype.cmp(&b.filetype));
+
     let res = BrowsePage {
         server_path,
         entries,
@@ -301,72 +271,4 @@ pub(crate) async fn upload_file(
             Err(Error::BadRequest("No file uploaded".to_string()))
         }
     }
-}
-
-#[derive(Debug, Deserialize, Template)]
-#[template(path = "delete_form.html")]
-pub(crate) struct DeleteForm {
-    filename: String,
-    server_path: String,
-    filepath: String,
-}
-
-pub(crate) async fn delete_file_get(
-    State(state): State<WebState>,
-    Query(query): Query<DeleteForm>,
-) -> Result<DeleteForm, Error> {
-    let server_reader = state.configuration.read().await;
-
-    let server_path_object = match server_reader.server_paths.get(&query.server_path) {
-        None => {
-            error!("Couldn't find server path {}", query.server_path);
-            return Err(Error::NotFound(query.server_path));
-        }
-        Some(p) => p,
-    };
-
-    let filekidfs = fs_from_serverpath(server_path_object)?;
-    if !filekidfs.exists(&query.filepath)? {
-        error!("Couldn't find file path {:?}", query.filepath);
-        return Err(Error::NotFound(query.filepath));
-    }
-
-    Ok(DeleteForm {
-        server_path: query.server_path,
-        filename: query.filename,
-        filepath: query.filepath,
-    })
-}
-
-pub(crate) async fn delete_file_post(
-    State(state): State<WebState>,
-    Form(form): Form<DeleteForm>,
-) -> Result<impl IntoResponse, Error> {
-    let server_reader = state.configuration.read().await;
-
-    let server_path_object = match server_reader.server_paths.get(&form.server_path) {
-        None => {
-            error!("Couldn't find server path {}", form.server_path);
-            return Err(Error::NotFound(form.server_path));
-        }
-        Some(p) => p,
-    };
-
-    let filekidfs = fs_from_serverpath(server_path_object)?;
-
-    if !filekidfs.exists(&form.filepath)? {
-        error!("Couldn't find file path {:?}", form.filepath);
-        return Err(Error::NotFound(form.filepath));
-    }
-
-    let target_file = filekidfs.target_path(&form.filepath, &form.filename)?;
-
-    filekidfs.delete_file(&target_file)?;
-
-    Ok(Redirect::to(&format!(
-        "{}/{}/{}",
-        Urls::Browse.as_ref(),
-        form.server_path,
-        form.filepath
-    )))
 }

@@ -151,6 +151,13 @@ impl FileKidFs for TempDir {
 
         Ok(res)
     }
+
+    fn is_file(&self, _key: &str) -> bool {
+        todo!()
+    }
+    fn is_dir(&self, _key: &str) -> bool {
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -163,7 +170,7 @@ mod tests {
     use super::*;
     use crate::fs::FileKidFs;
     use crate::log::setup_logging;
-    use crate::views::browse::FileType;
+    use crate::views::FileType;
 
     #[test]
     fn test_tempdir_get_outside_parent() {
