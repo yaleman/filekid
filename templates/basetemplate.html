@@ -17,6 +17,8 @@
     <main>
       {% block body %} {% endblock %}
     </main>
-    <footer>{% block footer %}{% endblock %}</footer>
+    <footer>
+      {% block footer %} Logged in as: {{username}}{% endblock %}
+    </footer>
   </body>
 </html>

@@ -21,12 +21,14 @@ pub enum Error {
     InternalServerError(String),
     /// IO things went bad
     Io(String),
-    /// You've askked for something you're not allowed to have
+    /// You've asked for something you're not allowed to have
     NotAuthorized(String),
     /// Can't handle this file type yet
     InvalidFileType(String),
     /// You did something weird
     BadRequest(String),
+    /// Something database-y went wrong
+    Database(String),
 }
 
 impl From<axum_oidc::error::Error> for Error {
@@ -59,6 +61,7 @@ impl IntoResponse for Error {
             Error::NotAuthorized(_) => StatusCode::FORBIDDEN,
             Error::InvalidFileType(_) => StatusCode::BAD_REQUEST,
             Error::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Error::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (
             statuscode,
@@ -82,6 +85,7 @@ impl Display for Error {
             Error::NotAuthorized(e) => write!(f, "Not authorized: {}", e),
             Error::InvalidFileType(e) => write!(f, "Invalid file type: {}", e),
             Error::BadRequest(e) => write!(f, "Bad request: {}", e),
+            Error::Database(e) => write!(f, "Database error: {}", e),
         }
     }
 }
@@ -146,6 +150,13 @@ mod tests {
         let e = Error::BadRequest("bad request".to_string());
         assert_eq!(format!("{}", e), "Bad request: bad request");
         assert_eq!(e.clone().into_response().status(), StatusCode::BAD_REQUEST);
+
+        let e = Error::Database("database error".to_string());
+        assert_eq!(format!("{}", e), "Database error: database error");
+        assert_eq!(
+            e.clone().into_response().status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]

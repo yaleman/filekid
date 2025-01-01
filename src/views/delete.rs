@@ -1,6 +1,6 @@
 //! Delete-file related things
 
-use super::prelude::*;
+use super::{check_login, prelude::*};
 
 use crate::fs::fs_from_serverpath;
 use askama::Template;
@@ -13,6 +13,7 @@ use axum::Form;
 pub(crate) struct DeleteForm {
     server_path: String,
     key: String,
+    username: String,
 }
 
 impl DeleteForm {
@@ -27,7 +28,10 @@ impl DeleteForm {
 pub(crate) async fn delete_file_get(
     State(state): State<WebState>,
     Query(query): Query<DeleteForm>,
+    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
 ) -> Result<DeleteForm, Error> {
+    let user = check_login(claims)?;
+
     let server_reader = state.configuration.read().await;
 
     let server_path_object = match server_reader.server_paths.get(&query.server_path) {
@@ -47,6 +51,7 @@ pub(crate) async fn delete_file_get(
     Ok(DeleteForm {
         server_path: query.server_path,
         key: query.key,
+        username: user.username(),
     })
 }
 

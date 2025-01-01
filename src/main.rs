@@ -15,7 +15,7 @@ use tokio::sync::RwLock;
 async fn main() -> Result<(), filekid::error::Error> {
     let cli = CliOpts::parse();
 
-    setup_logging(cli.debug, true).map_err(|err| Error::Generic(err.to_string()))?;
+    setup_logging(cli.debug, cli.db_debug).map_err(|err| Error::Generic(err.to_string()))?;
 
     let mut config = filekid::config::Config::new(cli)?;
     config.startup_check()?;

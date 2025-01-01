@@ -23,10 +23,9 @@ pub fn setup_logging(debug: bool, db_debug: bool) -> Result<(), log::SetLoggerEr
 
     builder.filter_level(level);
 
+    // h2 is pretty noisy
     builder.filter(Some("h2::codec"), LevelFilter::Warn);
-    if level == LevelFilter::Info {
-        builder.filter(Some("ssh::"), LevelFilter::Warn);
-    }
+    builder.filter(Some("h2::proto"), LevelFilter::Info);
 
     if !db_debug {
         // We don't always want to see the SQL queries in the logs

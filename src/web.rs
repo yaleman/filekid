@@ -8,6 +8,7 @@ use std::str::FromStr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLockReadGuard;
 use tower_http::services::ServeDir;
+use tower_sessions_sqlx_store::SqliteStore;
 
 use askama_axum::IntoResponse;
 use axum::error_handling::HandleErrorLayer;
@@ -20,9 +21,7 @@ use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer};
 use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
 
-use tower_sessions::cookie::time::Duration;
-use tower_sessions::cookie::SameSite;
-use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::SessionManagerLayer;
 use tracing::{debug, error, info};
 
 use crate::constants::WEB_SERVER_DEFAULT_STATIC_PATH;
@@ -69,12 +68,10 @@ async fn up(State(_state): State<WebState>) -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 
-// /// Create the database-backed session store
-// pub fn get_session_store(db: &Arc<DatabaseConnection>) -> entities::session::ModelStore {
-//     crate::db::entities::session::ModelStore::new(db.clone())
-// }
-
-pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
+pub(crate) async fn build_app(
+    state: WebState,
+    session_layer: SessionManagerLayer<SqliteStore>,
+) -> Result<Router, Error> {
     // get all the config variables we need, quickly, so we can drop the lock
 
     let config_reader = state.configuration.read().await;
@@ -83,15 +80,6 @@ pub(crate) async fn build_app(state: WebState) -> Result<Router, Error> {
     let oidc_client_secret = config_reader.oidc_client_secret.clone();
     let frontend_url = config_reader.frontend_url.clone();
     drop(config_reader);
-
-    // let session_store = get_session_store(&state.db);
-    let session_store = MemoryStore::default();
-
-    let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(true)
-        .with_same_site(SameSite::Lax)
-        .with_http_only(true)
-        .with_expiry(Expiry::OnInactivity(Duration::seconds(1800)));
 
     let frontend_url = Uri::from_str(&frontend_url)
         .map_err(|err| Error::Configuration(format!("Failed to parse base_url: {:?}", err)))?;
@@ -260,9 +248,12 @@ pub async fn run_web_server(
     web_tx: Sender<WebServerControl>,
     mut web_server_controller: Receiver<WebServerControl>,
 ) -> Result<(), Error> {
+    let (_deletion_task, session_layer) = crate::session_store::build(None).await?;
+
     let app = build_app(
         // TODO web_tx impl
         WebState::new(web_tx.clone(), configuration.clone(), config_filepath).await?,
+        session_layer,
     )
     .await?;
 

@@ -15,6 +15,9 @@ pub struct CliOpts {
     #[clap(long)]
     #[cfg(any(debug_assertions, test))]
     pub oauth2_disable: bool,
+
+    #[clap(long)]
+    pub db_debug: bool,
 }
 
 impl CliOpts {

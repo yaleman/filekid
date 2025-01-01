@@ -1,7 +1,9 @@
 //! OIDC-related views
 
 use super::prelude::*;
+use axum::http::StatusCode;
 use axum::http::Uri;
+use axum::response::IntoResponse;
 use axum::response::Redirect;
 use axum_oidc::OidcRpInitiatedLogout;
 
@@ -31,8 +33,52 @@ pub async fn rp_logout(
 }
 
 /// Logs the user out
-pub async fn logout(session: Session) -> Result<Redirect, (StatusCode, &'static str)> {
+pub(crate) async fn logout(session: Session) -> Result<Redirect, (StatusCode, &'static str)> {
     session.clear().await;
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     Ok(Redirect::to(Urls::Index.as_ref()))
+}
+
+#[cfg(test)]
+pub(crate) const OIDC_TEST_USERNAME: &str = "testuser@example.com";
+
+#[cfg(test)]
+/// Use this when you want to be "authenticated"
+pub(crate) fn test_user_claims() -> OidcClaims<EmptyAdditionalClaims> {
+    use std::str::FromStr;
+
+    use openidconnect::url::Url;
+    use openidconnect::{IssuerUrl, StandardClaims, SubjectIdentifier};
+
+    OidcClaims::<EmptyAdditionalClaims>(openidconnect::IdTokenClaims::new(
+        IssuerUrl::from_url(Url::from_str("https://example.com").expect("Failed to parse URL")),
+        vec![],
+        chrono::Utc::now() + chrono::Duration::hours(1),
+        chrono::Utc::now(),
+        StandardClaims::new(SubjectIdentifier::new(OIDC_TEST_USERNAME.to_string())),
+        EmptyAdditionalClaims {},
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use tower_sessions::MemoryStore;
+    use tower_sessions::Session;
+
+    #[tokio::test]
+    async fn test_logout() {
+        let session = Session::new(None, Arc::new(MemoryStore::default()), None);
+        let response = logout(session).await;
+
+        assert!(response.is_ok());
+        let redirect = response.unwrap().into_response();
+        assert_eq!(redirect.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            redirect.headers().get("location").unwrap(),
+            Urls::Index.as_ref()
+        );
+    }
 }

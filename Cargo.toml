@@ -7,12 +7,18 @@ edition = "2021"
 askama = { version = "0.12.1", features = ["with-axum"] }
 askama_axum = "0.4.0"
 async-trait = "0.1.83"
-axum = { version = "0.7.9", features = ["macros", "multipart", "http2"] }
+axum = { version = "0.7.9", features = [
+    "macros",
+    "multipart",
+    "http2",
+    "tracing",
+] }
 axum-oidc = "0.5.0"
 axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"] }
 clap = { version = "4.5.23", features = ["derive"] }
 enum-iterator = "2.1.0"
 env_logger = "0.11.6"
+etcetera = "0.8.0"
 futures = "0.3.31"
 log = { version = "0.4.22", features = ["serde"] }
 mime_guess = "2.0.5"
@@ -31,7 +37,9 @@ tokio-util = "0.7.13"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["fs", "limit"] }
 tower-sessions = "0.13.0"
+tower-sessions-sqlx-store = { version = "0.14.2", features = ["sqlite"] }
 tracing = "0.1.41"
 
 [dev-dependencies]
+chrono = "0.4.39"
 openidconnect = "3.5.0"

@@ -22,8 +22,12 @@ pub mod fs;
 pub mod log;
 pub mod oidc;
 pub(crate) mod prelude;
+pub(crate) mod session_store;
 pub mod views;
 pub mod web;
+
+#[cfg(test)]
+use axum::extract::State;
 
 use config::Config;
 use error::Error;
@@ -80,6 +84,23 @@ impl WebState {
             web_tx,
             config_filepath,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn test_webstate() -> Self {
+        let (tx, _rx) = tokio::sync::mpsc::channel(1);
+        let config = Arc::new(RwLock::new(
+            Config::new(cli::CliOpts::test_default()).expect("Failed to make a config"),
+        ));
+        let config_filepath = PathBuf::from("test");
+        Self::new(tx, config, config_filepath)
+            .await
+            .expect("Failed to get state")
+    }
+
+    #[cfg(test)]
+    pub(crate) fn as_state(self) -> State<Self> {
+        State(self)
     }
 }
 

@@ -10,6 +10,7 @@ use tracing::{debug, warn};
 
 use super::{prelude::*, FileType};
 use crate::fs::fs_from_serverpath;
+use crate::oidc::check_login;
 
 pub(crate) async fn get_file(
     State(state): State<WebState>,
@@ -62,6 +63,7 @@ pub(crate) struct BrowsePage {
     entries: Vec<FileEntry>,
     parent_path: String,
     current_path: String,
+    username: String,
 }
 
 #[derive(Debug)]
@@ -112,16 +114,20 @@ impl TryFrom<DirEntry> for FileEntry {
 pub(crate) async fn browse_nopath(
     State(state): State<WebState>,
     Path(server_path): Path<String>,
+    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
 ) -> Result<BrowsePage, Error> {
-    browse(State(state), Path((server_path, None))).await
+    browse(State(state), Path((server_path, None)), claims).await
 }
 
 // /// Browse the files in a server path.
 pub(crate) async fn browse(
     State(state): State<WebState>,
     Path((server_path, filepath)): Path<(String, Option<String>)>,
+    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
 ) -> Result<BrowsePage, Error> {
-    // let path = path.server_path.clone();
+    let user = check_login(claims)?;
+    debug!("User {} logged in", user.username());
+
     let server_reader = state.configuration.read().await;
 
     let server_path_object = match server_reader.server_paths.get(&server_path) {
@@ -168,6 +174,7 @@ pub(crate) async fn browse(
         entries,
         parent_path,
         current_path: filepath.unwrap_or("".to_string()),
+        username: user.username(),
     };
     Ok(res)
 }

@@ -10,13 +10,22 @@ use std::path::PathBuf;
 
 use prelude::*;
 
+use crate::oidc::check_login;
+
 #[derive(Template)]
 #[template(path = "index.html")]
 pub(crate) struct HomePage {
     server_paths: Vec<(String, ServerPath)>,
+    username: String,
 }
 
-pub(crate) async fn home(State(state): State<WebState>) -> Result<HomePage, Error> {
+pub(crate) async fn home(
+    State(state): State<WebState>,
+    claims: Option<OidcClaims<EmptyAdditionalClaims>>,
+) -> Result<HomePage, Error> {
+    let user = check_login(claims)?;
+    debug!("User {} logged in", user.username());
+
     let mut server_paths = state
         .configuration
         .read()
@@ -27,7 +36,10 @@ pub(crate) async fn home(State(state): State<WebState>) -> Result<HomePage, Erro
         .collect::<Vec<(String, ServerPath)>>();
     server_paths.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-    Ok(HomePage { server_paths })
+    Ok(HomePage {
+        server_paths,
+        username: user.username(),
+    })
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -78,5 +90,36 @@ impl TryFrom<&PathBuf> for FileType {
         } else {
             Err(Error::InvalidFileType(value.display().to_string()))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use oidc::test_user_claims;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_home() {
+        home(
+            WebState::test_webstate().await.as_state(),
+            Some(test_user_claims()),
+        )
+        .await
+        .expect("Failed to render home page");
+    }
+
+    #[test]
+    fn test_filetype() {
+        let file = PathBuf::from("Cargo.toml");
+        let dir = PathBuf::from("src/");
+
+        assert_eq!(FileType::try_from(&file).unwrap(), FileType::File);
+        assert_eq!(FileType::try_from(&dir).unwrap(), FileType::Directory);
+
+        assert!(FileType::Directory < FileType::File);
+
+        assert_eq!(FileType::Directory.icon(), "folder.svg");
+        assert_eq!(FileType::File.icon(), "file.svg");
     }
 }
