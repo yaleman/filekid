@@ -12,3 +12,4 @@ Yeah, there's a goat theme with my projects.
   - [Trash can](https://thenounproject.com/icon/trash-can-6581793/)
 - [Baby goat test image](https://www.flickr.com/photos/mike_grauer/49654141727)
 - [Simple.css framework](https://simplecss.org)
+- [Goat Icon from ParadixiArt](https://thenounproject.com/icon/goat-7379981/) on the Noun Project

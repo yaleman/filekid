@@ -3,18 +3,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="shortcut icon" href="{{ Urls::Static.as_ref() }}/goaticon.svg" />
+    <link rel="shortcut icon" href="{{ Urls::Static.as_ref() }}/goaticon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="{{ Urls::Static.as_ref() }}/simple.min.css" />
     <link rel="stylesheet" href="{{ Urls::Static.as_ref() }}/filekid.css" />
   </head>
   <body>
-  <header>
-    <h1><a href="{{ Urls::Index.as_ref() }}">FileKid</a></h1>
-    {% block nav %} {% endblock %}
-  </header>
-  <main>
+    <header>
+      <h1><a href="{{ Urls::Index.as_ref() }}">FileKid</a></h1>
+      {% block nav %} {% endblock %}
+    </header>
+    <main>
       {% block body %} {% endblock %}
-  </main>
+    </main>
     <footer>{% block footer %}{% endblock %}</footer>
-</body>
+  </body>
 </html>
