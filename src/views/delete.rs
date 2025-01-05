@@ -10,13 +10,13 @@ use axum::Form;
 
 #[derive(Debug, Deserialize, Template)]
 #[template(path = "delete_form.html")]
-pub(crate) struct DeleteForm {
+pub(crate) struct DeletePage {
     server_path: String,
     key: String,
     username: String,
 }
 
-impl DeleteForm {
+impl DeletePage {
     fn parent_path(&self) -> String {
         let path = self.key.clone();
         let mut path = path.split('/').collect::<Vec<&str>>();
@@ -25,11 +25,17 @@ impl DeleteForm {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct DeleteQuery {
+    server_path: String,
+    key: String,
+}
+
 pub(crate) async fn delete_file_get(
     State(state): State<WebState>,
-    Query(query): Query<DeleteForm>,
+    Query(query): Query<DeleteQuery>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<DeleteForm, Error> {
+) -> Result<DeletePage, Error> {
     let user = check_login(claims)?;
 
     let server_reader = state.configuration.read().await;
@@ -48,7 +54,7 @@ pub(crate) async fn delete_file_get(
         return Err(Error::NotFound(query.key));
     }
 
-    Ok(DeleteForm {
+    Ok(DeletePage {
         server_path: query.server_path,
         key: query.key,
         username: user.username(),
@@ -57,7 +63,7 @@ pub(crate) async fn delete_file_get(
 
 pub(crate) async fn delete_file_post(
     State(state): State<WebState>,
-    Form(form): Form<DeleteForm>,
+    Form(form): Form<DeletePage>,
 ) -> Result<impl IntoResponse, Error> {
     let server_reader = state.configuration.read().await;
 
