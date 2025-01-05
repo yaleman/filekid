@@ -4,6 +4,12 @@ Free file manager thing with OAuth2 auth (soon).
 
 Yeah, there's a goat theme with my projects.
 
+## Docker usage
+
+- Defaults to port 6969
+- Config is expected at `/config/filekid.json`
+- No I won't disable the requirement for TLS.
+
 ## Thanks
 
 - Icons by Acharyas on the Noun Project

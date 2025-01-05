@@ -33,6 +33,8 @@ RUN chmod +x /filekid/target/release/filekid
 # https://github.com/GoogleContainerTools/distroless/blob/main/examples/rust/Dockerfile
 FROM debian:12-slim AS filekid
 
+ENV FILEKID_CONFIG=/config/filekid.json
+
 COPY --from=cargo_builder /filekid/target/release/filekid /filekid
 COPY ./static /static/
 RUN useradd filekid
