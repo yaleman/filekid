@@ -91,7 +91,13 @@ impl Config {
             )));
         }
 
-        let config = std::fs::read_to_string(filename)?;
+        let config = std::fs::read_to_string(filename).map_err(|err| {
+            Error::Configuration(format!(
+                "Couldn't read configuration file {}, error: {}",
+                filename.display(),
+                err
+            ))
+        })?;
         serde_json::from_str(&config).map_err(|e| {
             eprintln!("Failed to parse config as JSONj: {}", e);
             Error::Configuration(e.to_string())

@@ -6,17 +6,17 @@ use clap::Parser;
 
 #[derive(Parser, Debug, Default)]
 pub struct CliOpts {
-    #[clap(short, long)]
+    #[clap(short, long, env = "FILEKID_CONFIG")]
     pub config: Option<PathBuf>,
 
-    #[clap(short, long)]
+    #[clap(short, long, env = "FILEKID_DEBUG")]
     pub debug: bool,
 
-    #[clap(long)]
+    #[clap(long, env = "FILEKID_OAUTH2_DISABLE")]
     #[cfg(any(debug_assertions, test))]
     pub oauth2_disable: bool,
 
-    #[clap(long)]
+    #[clap(long, env = "FILEKID_DB_DEBUG")]
     pub db_debug: bool,
 }
 

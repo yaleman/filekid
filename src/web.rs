@@ -123,7 +123,6 @@ pub(crate) async fn build_app(
             &format!("{}/:server_path/*filepath", Urls::GetFile.as_ref()),
             get(get_file),
         )
-        // after here, the routers don't *require* auth
         .route(Urls::Index.as_ref(), get(views::home));
 
     let app = Router::new()
@@ -168,7 +167,7 @@ pub(crate) async fn build_app(
                     .layer(oidc_auth_layer)
             }
         };
-
+    // after here, the routers don't *require* auth
     let app = app
         // after here, the URLs cannot have auth
         .route(Urls::HealthCheck.as_ref(), get(up))
