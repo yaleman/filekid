@@ -17,6 +17,14 @@ fn bind_address_default() -> IpAddr {
         .expect("Failed to parse built-in default local address!")
 }
 
+const DEFAULT_PORT: u16 = 6969;
+
+/// Defaults to 6969
+fn default_port() -> NonZeroU16 {
+    #[allow(clippy::expect_used)]
+    NonZeroU16::new(DEFAULT_PORT).expect("Failed to create default port from a known constant!")
+}
+
 /// Defaults to 1GB (1024MB)
 fn default_max_upload_mb() -> usize {
     1024
@@ -29,6 +37,7 @@ pub struct Config {
     /// The bind address.
     pub bind_address: IpAddr,
     /// The port to bind to, the default is 6969
+    #[serde(default = "default_port")]
     pub port: NonZeroU16,
     /// The maximum request body size.
     pub default_request_body_max_bytes: Option<u64>,
@@ -66,10 +75,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(cli: CliOpts) -> Result<Self, Error> {
-        let config_filename = cli.config.unwrap_or(PathBuf::from("filekid.json"));
-
-        let mut config = Self::from_file(&config_filename)?;
+    pub fn new(cli: &CliOpts) -> Result<Self, Error> {
+        let mut config = Self::from_file(&cli.config)?;
 
         if cli.debug {
             config.debug = true
@@ -125,7 +132,7 @@ impl Config {
     }
 
     pub fn listen_addr(&self) -> String {
-        format!("{}:{}", self.bind_address, self.port)
+        format!("{}:{}", self.bind_address, self.port.get())
     }
 }
 
@@ -168,9 +175,9 @@ mod tests {
         assert!(badconfig.is_err());
 
         let mut cliopts = CliOpts::default();
-        cliopts.config = Some(PathBuf::from("files/example-config.json"));
+        cliopts.config = PathBuf::from("files/example-config.json");
 
-        Config::new(cliopts).expect("Failed to get config from cli defaults (with switched file)");
+        Config::new(&cliopts).expect("Failed to get config from cli defaults (with switched file)");
     }
 
     #[test]
