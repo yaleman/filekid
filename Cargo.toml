@@ -36,7 +36,7 @@ tokio = { version = "1.42.0", features = [
 tokio-util = "0.7.13"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["fs", "limit"] }
-tower-sessions = "0.13.0"
+tower-sessions = "0.14.0"
 tower-sessions-sqlx-store = { version = "0.14.2", features = [
     "sqlite",
 ], default-features = false }
