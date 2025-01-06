@@ -30,6 +30,14 @@ pub(crate) struct DeleteQuery {
     server_path: String,
     key: String,
 }
+impl DeleteQuery {
+    fn parent_path(&self) -> String {
+        let path = self.key.clone();
+        let mut path = path.split('/').collect::<Vec<&str>>();
+        path.pop();
+        path.join("/")
+    }
+}
 
 pub(crate) async fn delete_file_get(
     State(state): State<WebState>,
@@ -63,7 +71,7 @@ pub(crate) async fn delete_file_get(
 
 pub(crate) async fn delete_file_post(
     State(state): State<WebState>,
-    Form(form): Form<DeletePage>,
+    Form(form): Form<DeleteQuery>,
 ) -> Result<impl IntoResponse, Error> {
     let server_reader = state.configuration.read().await;
 
