@@ -37,7 +37,7 @@ tokio-util = "0.7.13"
 tower = "0.5.2"
 tower-http = { version = "0.6.2", features = ["fs", "limit"] }
 tower-sessions = "0.13.0"
-tower-sessions-sqlx-store = { version = "0.14.2", features = [
+tower-sessions-sqlx-store = { version = "0.15.0", features = [
     "sqlite",
 ], default-features = false }
 tracing = "0.1.41"
