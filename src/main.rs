@@ -17,7 +17,7 @@ async fn main() -> Result<(), filekid::error::Error> {
 
     setup_logging(cli.debug, cli.db_debug).map_err(|err| Error::Generic(err.to_string()))?;
 
-    let mut config = filekid::config::Config::new(cli)?;
+    let mut config = filekid::config::Config::new(&cli)?;
     config.startup_check()?;
 
     let (web_tx, web_rx) = tokio::sync::mpsc::channel(1);

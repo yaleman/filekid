@@ -75,7 +75,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(cli: CliOpts) -> Result<Self, Error> {
+    pub fn new(cli: &CliOpts) -> Result<Self, Error> {
         let mut config = Self::from_file(&cli.config)?;
 
         if cli.debug {
@@ -177,7 +177,7 @@ mod tests {
         let mut cliopts = CliOpts::default();
         cliopts.config = PathBuf::from("files/example-config.json");
 
-        Config::new(cliopts).expect("Failed to get config from cli defaults (with switched file)");
+        Config::new(&cliopts).expect("Failed to get config from cli defaults (with switched file)");
     }
 
     #[test]
