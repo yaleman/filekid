@@ -44,4 +44,4 @@ tracing = "0.1.41"
 
 [dev-dependencies]
 chrono = "0.4.39"
-openidconnect = "3.5.0"
+openidconnect = "4.0.0"
