@@ -13,7 +13,7 @@ axum = { version = "0.7.9", features = [
     "http2",
     "tracing",
 ] }
-axum-oidc = "0.5.0"
+axum-oidc = "0.6.0"
 axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"] }
 clap = { version = "4.5.28", features = ["derive", "env"] }
 enum-iterator = "2.1.0"
