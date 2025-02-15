@@ -4,3 +4,5 @@ filekid.json
 tarpaulin-report.html
 files/*
 *.profraw
+.cargo/config.toml
+vendor/
