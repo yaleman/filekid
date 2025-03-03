@@ -43,5 +43,5 @@ tower-sessions-sqlx-store = { version = "0.14.2", features = [
 tracing = "0.1.41"
 
 [dev-dependencies]
-chrono = "0.4.39"
+chrono = "0.4.40"
 openidconnect = "3.5.0"
