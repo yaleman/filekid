@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.8
         with:
           version: "v0.5.4"
       - name: Install Rust
@@ -23,7 +23,7 @@ jobs:
         with:
           toolchain: stable
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.7
+        uses: mozilla-actions/sccache-action@v0.0.8
         with:
           version: "v0.4.2"
       - name: Install typical dependencies
