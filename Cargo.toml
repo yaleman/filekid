@@ -18,7 +18,7 @@ axum-server = { version = "0.7.1", features = ["rustls", "tls-rustls"] }
 clap = { version = "4.5.31", features = ["derive", "env"] }
 enum-iterator = "2.1.0"
 env_logger = "0.11.6"
-etcetera = "0.9.0"
+etcetera = "0.10.0"
 futures = "0.3.31"
 log = { version = "0.4.26", features = ["serde"] }
 mime_guess = "2.0.5"
