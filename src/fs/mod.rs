@@ -132,7 +132,10 @@ mod tests {
         };
         let fs = fs_from_serverpath(&server_path);
         assert!(fs.is_ok());
-        assert_eq!(fs.unwrap().name(), "local:/some/local/path");
+        assert_eq!(
+            fs.expect("Failed to get filekidfs").name(),
+            "local:/some/local/path"
+        );
     }
 
     #[test]
@@ -143,7 +146,10 @@ mod tests {
         };
         let fs = fs_from_serverpath(&server_path);
         assert!(fs.is_ok());
-        assert_eq!(fs.unwrap().name(), "tempdir (/some/tempdir/path)");
+        assert_eq!(
+            fs.expect("Failed to get filekidfs").name(),
+            "tempdir (/some/tempdir/path)"
+        );
     }
 
     #[test]

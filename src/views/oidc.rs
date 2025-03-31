@@ -74,10 +74,13 @@ mod tests {
         let response = logout(session).await;
 
         assert!(response.is_ok());
-        let redirect = response.unwrap().into_response();
+        let redirect = response.expect("Failed to get response").into_response();
         assert_eq!(redirect.status(), StatusCode::SEE_OTHER);
         assert_eq!(
-            redirect.headers().get("location").unwrap(),
+            redirect
+                .headers()
+                .get("location")
+                .expect("Failed to get location header"),
             Urls::Index.as_ref()
         );
     }

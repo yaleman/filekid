@@ -181,7 +181,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_localfs_name() {
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = TempDir::new(temp_dir_path.clone());
@@ -194,7 +194,7 @@ mod tests {
     async fn test_list_dir() {
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let mut file = File::create(temp_dir.path().join("test.txt"))
@@ -206,7 +206,7 @@ mod tests {
 
         let fs = TempDir::new(temp_dir_path);
 
-        let entries = fs.list_dir(None).unwrap();
+        let entries = fs.list_dir(None).expect("Failed to list dir");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].filename, "test.txt");
         assert_eq!(entries[0].fullpath, "test.txt");
@@ -216,7 +216,9 @@ mod tests {
         dbg!(&bad_test);
         assert!(bad_test.is_err());
 
-        let entries = fs.list_dir(Some(".".to_string())).unwrap();
+        let entries = fs
+            .list_dir(Some(".".to_string()))
+            .expect("Failed to list dir");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].filename, "test.txt");
         assert_eq!(entries[0].fullpath, "./test.txt");
@@ -231,7 +233,7 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = TempDir::new(temp_dir_path);
@@ -248,15 +250,17 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
-        let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
-        file.write_all(b"Hello, world!").unwrap();
+        let mut file = File::create(temp_dir.path().join("test.txt"))
+            .expect("Failed to create the test temp file");
+        file.write_all(b"Hello, world!")
+            .expect("failed to write to file");
 
         let fs = TempDir::new(temp_dir_path);
 
-        let contents = fs.get_file("test.txt").await.unwrap();
+        let contents = fs.get_file("test.txt").await.expect("Failed to get file");
         assert_eq!(contents, b"Hello, world!");
 
         let result = fs.get_file("canotgtsdaftest.txt").await;
@@ -270,7 +274,7 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = TempDir::new(temp_dir_path.clone());
@@ -283,12 +287,12 @@ mod tests {
 
         let res = fs.get_data(filename);
         assert!(res.is_ok());
-        let filedata = res.unwrap();
+        let filedata = res.expect("Failed to get file data");
         assert_eq!(filedata.size, Some(13));
 
         let res = fs.get_file(filename).await;
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), contents);
+        assert_eq!(res.expect("Failed to run get file"), contents);
 
         // test putting a file outside the base path
         let outside_target_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

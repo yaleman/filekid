@@ -2,8 +2,8 @@
 
 use super::web::Urls;
 use askama::Template;
-use askama_axum::IntoResponse;
-use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::{http::StatusCode, response::Response};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -29,6 +29,8 @@ pub enum Error {
     BadRequest(String),
     /// Something database-y went wrong
     Database(String),
+    /// Template rendering failed
+    TemplateRendering(String),
 }
 
 impl From<axum_oidc::error::Error> for Error {
@@ -43,6 +45,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<askama::Error> for Error {
+    fn from(e: askama::Error) -> Self {
+        Self::TemplateRendering(e.to_string())
+    }
+}
+
 #[derive(Template)]
 #[template(path = "error.html")]
 struct ErrorPage {
@@ -50,7 +58,7 @@ struct ErrorPage {
 }
 
 impl IntoResponse for Error {
-    fn into_response(self) -> askama_axum::Response {
+    fn into_response(self) -> Response {
         let statuscode = match self {
             Error::Generic(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Configuration(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -62,12 +70,18 @@ impl IntoResponse for Error {
             Error::InvalidFileType(_) => StatusCode::BAD_REQUEST,
             Error::BadRequest(_) => StatusCode::BAD_REQUEST,
             Error::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::TemplateRendering(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (
             statuscode,
             ErrorPage {
                 error: self.to_string(),
-            },
+            }
+            .render()
+            .map_err(|error| {
+                log::error!("Error rendering error page: {}", error);
+                Error::InternalServerError(format!("Error rendering error page: {}", error))
+            }),
         )
             .into_response()
     }
@@ -85,6 +99,7 @@ impl Display for Error {
             Error::NotAuthorized(e) => write!(f, "Not authorized: {}", e),
             Error::InvalidFileType(e) => write!(f, "Invalid file type: {}", e),
             Error::BadRequest(e) => write!(f, "Bad request: {}", e),
+            Error::TemplateRendering(e) => write!(f, "Template rendering error: {}", e),
             Error::Database(e) => write!(f, "Database error: {}", e),
         }
     }

@@ -78,14 +78,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_oidc_error_handler() {
-        let _ = setup_logging(true, true).expect("Failed to set up logging");
+        setup_logging(true, true).expect("Failed to set up logging");
 
         let (tx, mut rx) = channel(1);
         let handler = OidcErrorHandler::new(Some(tx));
         handler
             .handle_oidc_error(&MiddlewareError::CsrfTokenInvalid)
             .await;
-        let msg = rx.recv().await.unwrap();
+        let msg = rx.recv().await.expect("Failed to receive message");
         assert_eq!(msg, WebServerControl::ReloadAfter(RELOAD_TIME));
     }
 

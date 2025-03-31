@@ -22,7 +22,7 @@ pub(crate) struct HomePage {
 pub(crate) async fn home(
     State(state): State<WebState>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<HomePage, Error> {
+) -> Result<String, Error> {
     let user = check_login(claims)?;
     debug!("User {} logged in", user.username());
 
@@ -39,7 +39,8 @@ pub(crate) async fn home(
     Ok(HomePage {
         server_paths,
         username: user.username(),
-    })
+    }
+    .render()?)
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -102,7 +103,7 @@ mod tests {
     #[tokio::test]
     async fn test_home() {
         home(
-            WebState::test_webstate().await.as_state(),
+            WebState::test_webstate().await.to_state(),
             Some(test_user_claims()),
         )
         .await
@@ -114,8 +115,14 @@ mod tests {
         let file = PathBuf::from("Cargo.toml");
         let dir = PathBuf::from("src/");
 
-        assert_eq!(FileType::try_from(&file).unwrap(), FileType::File);
-        assert_eq!(FileType::try_from(&dir).unwrap(), FileType::Directory);
+        assert_eq!(
+            FileType::try_from(&file).expect("failed to convert filetype"),
+            FileType::File
+        );
+        assert_eq!(
+            FileType::try_from(&dir).expect("failed to convert filetype"),
+            FileType::Directory
+        );
 
         assert!(FileType::Directory < FileType::File);
 
