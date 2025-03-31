@@ -10,11 +10,10 @@ use tokio::sync::RwLockReadGuard;
 use tower_http::services::ServeDir;
 use tower_sessions_sqlx_store::SqliteStore;
 
-use askama_axum::IntoResponse;
 use axum::error_handling::HandleErrorLayer;
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{StatusCode, Uri};
-use axum::response::Redirect;
+use axum::response::{IntoResponse, Redirect};
 use axum::Router;
 use axum_oidc::error::MiddlewareError;
 use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer};

@@ -7,8 +7,8 @@ pub(crate) use crate::{Error, WebState};
 
 pub(crate) use askama::Template;
 
-pub(crate) use askama_axum::IntoResponse;
 pub(crate) use axum::http::StatusCode;
+pub(crate) use axum::response::IntoResponse;
 pub(crate) use serde::Deserialize;
 pub(crate) use tower_sessions::Session;
 pub(crate) use tracing::{debug, error, instrument};

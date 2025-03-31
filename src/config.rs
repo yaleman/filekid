@@ -145,7 +145,7 @@ mod tests {
     fn test_config() {
         let config = Config {
             bind_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            port: NonZeroU16::new(6969).unwrap(),
+            port: NonZeroU16::new(6969).expect("Failed to create default port"),
             default_request_body_max_bytes: None,
             server_paths: HashMap::new(),
             frontend_domain: "example.com".to_string(),
@@ -161,8 +161,9 @@ mod tests {
             max_upload_mb: 1024,
         };
 
-        let config_str = serde_json::to_string(&config).unwrap();
-        let config2: Config = serde_json::from_str(&config_str).unwrap();
+        let config_str = serde_json::to_string(&config).expect("failed to serialize config");
+        let config2: Config =
+            serde_json::from_str(&config_str).expect("failed to deserialize config");
         assert_eq!(config, config2);
 
         let _test_config_from_file = Config::from_file(&PathBuf::from("files/example-config.json"))
@@ -174,8 +175,10 @@ mod tests {
         dbg!(&badconfig);
         assert!(badconfig.is_err());
 
-        let mut cliopts = CliOpts::default();
-        cliopts.config = PathBuf::from("files/example-config.json");
+        let cliopts = CliOpts {
+            config: PathBuf::from("files/example-config.json"),
+            ..CliOpts::default()
+        };
 
         Config::new(&cliopts).expect("Failed to get config from cli defaults (with switched file)");
     }
@@ -194,7 +197,7 @@ mod tests {
     fn test_config_startup_check() {
         let mut config = Config {
             bind_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            port: NonZeroU16::new(6969).unwrap(),
+            port: NonZeroU16::new(6969).expect("Failed to create default port"),
             default_request_body_max_bytes: None,
             server_paths: HashMap::new(),
             frontend_domain: "example.com".to_string(),

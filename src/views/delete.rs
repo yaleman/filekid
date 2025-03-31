@@ -43,7 +43,7 @@ pub(crate) async fn delete_file_get(
     State(state): State<WebState>,
     Query(query): Query<DeleteQuery>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<DeletePage, Error> {
+) -> Result<String, Error> {
     let user = check_login(claims)?;
 
     let server_reader = state.configuration.read().await;
@@ -66,7 +66,8 @@ pub(crate) async fn delete_file_get(
         server_path: query.server_path,
         key: query.key,
         username: user.username(),
-    })
+    }
+    .render()?)
 }
 
 pub(crate) async fn delete_file_post(

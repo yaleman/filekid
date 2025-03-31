@@ -115,7 +115,7 @@ pub(crate) async fn browse_nopath(
     State(state): State<WebState>,
     Path(server_path): Path<String>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<BrowsePage, Error> {
+) -> Result<String, Error> {
     browse(State(state), Path((server_path, None)), claims).await
 }
 
@@ -124,7 +124,7 @@ pub(crate) async fn browse(
     State(state): State<WebState>,
     Path((server_path, filepath)): Path<(String, Option<String>)>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<BrowsePage, Error> {
+) -> Result<String, Error> {
     let user = check_login(claims)?;
     debug!("User {} logged in", user.username());
 
@@ -176,7 +176,7 @@ pub(crate) async fn browse(
         current_path: filepath.unwrap_or("".to_string()),
         username: user.username(),
     };
-    Ok(res)
+    Ok(res.render()?)
 }
 
 pub(crate) async fn upload_nopath(

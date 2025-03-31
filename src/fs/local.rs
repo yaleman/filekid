@@ -233,7 +233,7 @@ mod tests {
         use super::*;
         use tempfile::tempdir;
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = LocalFs::new(temp_dir_path.clone());
@@ -250,15 +250,17 @@ mod tests {
         use tempfile::tempdir;
 
         let _ = setup_logging(true, true);
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
-        let mut file = File::create(temp_dir.path().join("test.txt")).unwrap();
-        file.write_all(b"Hello, world!").unwrap();
+        let mut file =
+            File::create(temp_dir.path().join("test.txt")).expect("Failed to create file");
+        file.write_all(b"Hello, world!")
+            .expect("Failed to write to file");
 
         let fs = LocalFs::new(temp_dir_path.clone());
 
-        let entries = fs.list_dir(None).unwrap();
+        let entries = fs.list_dir(None).expect("Failed to list dir");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].filename, "test.txt");
         assert_eq!(entries[0].fullpath, "test.txt");
@@ -266,7 +268,9 @@ mod tests {
 
         assert!(fs.list_dir(Some("test.txt".to_string())).is_err());
 
-        let entries = fs.list_dir(Some(".".to_string())).unwrap();
+        let entries = fs
+            .list_dir(Some(".".to_string()))
+            .expect("Failed to list dir");
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].filename, "test.txt");
         assert_eq!(entries[0].fullpath, "./test.txt");
@@ -280,7 +284,7 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = LocalFs::new(temp_dir_path);
@@ -297,7 +301,7 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = LocalFs::new(temp_dir_path.clone());
@@ -322,7 +326,7 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = LocalFs::new(temp_dir_path.clone());
@@ -334,12 +338,12 @@ mod tests {
 
         let res = fs.get_data("test.txt");
         assert!(res.is_ok());
-        let filedata = res.unwrap();
+        let filedata = res.expect("Failed to get file data");
         assert_eq!(filedata.size, Some(13));
 
         let res = fs.get_file("test.txt").await;
         assert!(res.is_ok());
-        assert_eq!(res.unwrap(), contents);
+        assert_eq!(res.expect("Failed to run get_file"), contents);
 
         // test putting a file outside the base path
         let outside_res = fs.put_file("/etc/test.txt", contents).await;
@@ -359,19 +363,19 @@ mod tests {
 
         let _ = setup_logging(true, true);
 
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir().expect("Failed to create temp dir");
         let temp_dir_path = temp_dir.path().to_path_buf();
 
         let fs = LocalFs::new(temp_dir_path.clone());
 
         let res = fs.list_dir(None);
         assert!(res.is_ok());
-        let entries = res.unwrap();
+        let entries = res.expect("failed to get file entries");
         assert_eq!(entries.len(), 0);
 
         let res = fs.list_dir(Some(".".to_string()));
         assert!(res.is_ok());
-        let entries = res.unwrap();
+        let entries = res.expect("failed to get file entries");
         assert_eq!(entries.len(), 0);
 
         let res = fs.list_dir(Some("thiscannotexist.foo".to_string()));

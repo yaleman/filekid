@@ -30,9 +30,10 @@ pub struct CliOpts {
 impl CliOpts {
     #[cfg(test)]
     pub fn test_default() -> Self {
-        let mut opts = Self::default();
-        opts.config = PathBuf::from("files/example-config.json");
-        opts
+        CliOpts {
+            config: PathBuf::from("files/example-config.json"),
+            ..Default::default()
+        }
     }
 }
 

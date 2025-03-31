@@ -99,8 +99,8 @@ impl WebState {
     }
 
     #[cfg(test)]
-    pub(crate) fn as_state(self) -> State<Self> {
-        State(self)
+    pub(crate) fn to_state(&self) -> State<Self> {
+        State(self.clone())
     }
 }
 
