@@ -23,7 +23,7 @@ futures = "0.3.31"
 log = { version = "0.4.26", features = ["serde"] }
 mime_guess = "2.0.5"
 schemars = { version = "0.8.22", features = ["uuid", "url"] }
-serde = { version = "1.0.218", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 tempfile = "3.19.1"
 tokio = { version = "1.44.1", features = [
