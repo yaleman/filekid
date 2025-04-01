@@ -7,6 +7,9 @@ use crate::ServerPath;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
+
+#[cfg(test)]
+use std::net::Ipv4Addr;
 use std::num::NonZeroU16;
 use std::path::PathBuf;
 
@@ -134,16 +137,10 @@ impl Config {
     pub fn listen_addr(&self) -> String {
         format!("{}:{}", self.bind_address, self.port.get())
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::net::Ipv4Addr;
-
-    #[test]
-    fn test_config() {
-        let config = Config {
+    #[cfg(test)]
+    pub fn test_config() -> Self {
+        Config {
             bind_address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             port: NonZeroU16::new(6969).expect("Failed to create default port"),
             default_request_body_max_bytes: None,
@@ -159,7 +156,18 @@ mod tests {
             debug: false,
             oauth2_disabled: false,
             max_upload_mb: 1024,
-        };
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use std::net::Ipv4Addr;
+
+    #[test]
+    pub fn test_config() {
+        let config = Config::test_config();
 
         let config_str = serde_json::to_string(&config).expect("failed to serialize config");
         let config2: Config =

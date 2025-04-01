@@ -94,11 +94,11 @@ pub(crate) async fn build_app(
 
     let ui = Router::new()
         .route(
-            &format!("{}/:server_path/", Urls::Upload.as_ref()),
+            &format!("{}/{{server_path}}/", Urls::Upload.as_ref()),
             post(upload_nopath),
         )
         .route(
-            &format!("{}/:server_path/*filepath", Urls::Upload.as_ref()),
+            &format!("{}/{{server_path}}/{{*filepath}}", Urls::Upload.as_ref()),
             post(upload_file),
         )
         // TODO: this is pretty janky but it works for now
@@ -107,11 +107,11 @@ pub(crate) async fn build_app(
             state.configuration.read().await.max_upload_mb * 1024 * 1024,
         ))
         .route(
-            &format!("{}/:server_path/", Urls::Browse.as_ref()),
+            &format!("{}/{{server_path}}/", Urls::Browse.as_ref()),
             get(browse_nopath),
         )
         .route(
-            &format!("{}/:server_path/*filepath", Urls::Browse.as_ref()),
+            &format!("{}/{{server_path}}/{{*filepath}}", Urls::Browse.as_ref()),
             get(browse),
         )
         .route(
@@ -119,7 +119,7 @@ pub(crate) async fn build_app(
             get(delete_file_get).post(delete_file_post),
         )
         .route(
-            &format!("{}/:server_path/*filepath", Urls::GetFile.as_ref()),
+            &format!("{}/{{server_path}}/{{*filepath}}", Urls::GetFile.as_ref()),
             get(get_file),
         )
         .route(Urls::Index.as_ref(), get(views::home));
@@ -301,5 +301,39 @@ pub async fn run_web_server(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::Arc;
+
+    use tokio::sync::{mpsc, RwLock};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_run_web_server_starts() {
+        let config_filepath = PathBuf::from("test_config.toml");
+        let (web_tx, web_rx) = mpsc::channel(10);
+        let configuration = Arc::new(RwLock::new(Config::test_config()));
+
+        let server_tx = web_tx.clone();
+        let server = tokio::spawn(async move {
+            run_web_server(config_filepath, configuration, server_tx, web_rx).await
+        });
+
+        web_tx
+            .send(WebServerControl::StopAfter(0))
+            .await
+            .expect("Failed to send a message");
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        assert!(
+            server.await.is_ok(),
+            "Web server should start without errors"
+        );
     }
 }
