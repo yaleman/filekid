@@ -21,7 +21,6 @@ async fn main() -> Result<(), filekid::error::Error> {
     config.startup_check()?;
 
     let (web_tx, web_rx) = tokio::sync::mpsc::channel(1);
-    println!("Listening on {}", config.frontend_url.clone());
 
     let mut live_tempdirs: HashMap<String, tempfile::TempDir> = HashMap::new();
 
