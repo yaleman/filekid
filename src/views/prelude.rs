@@ -1,4 +1,4 @@
-//! Load all the usual thingsuse askama::Template;
+//! Load all the usual things
 pub(crate) use axum::extract::State;
 
 pub(crate) use crate::web::Urls;

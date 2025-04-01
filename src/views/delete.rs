@@ -5,7 +5,7 @@ use super::{check_login, prelude::*};
 use crate::fs::fs_from_serverpath;
 use askama::Template;
 use axum::extract::{Query, State};
-use axum::response::Redirect;
+use axum::response::{Html, Redirect, Response};
 use axum::Form;
 
 #[derive(Debug, Deserialize, Template)]
@@ -22,6 +22,15 @@ impl DeletePage {
         let mut path = path.split('/').collect::<Vec<&str>>();
         path.pop();
         path.join("/")
+    }
+}
+
+impl From<DeletePage> for Result<Response, Error>
+where
+    DeletePage: Template,
+{
+    fn from(page: DeletePage) -> Result<Response, Error> {
+        Ok(Html(page.render()?).into_response())
     }
 }
 
@@ -43,7 +52,7 @@ pub(crate) async fn delete_file_get(
     State(state): State<WebState>,
     Query(query): Query<DeleteQuery>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<String, Error> {
+) -> Result<Response, Error> {
     let user = check_login(claims)?;
 
     let server_reader = state.configuration.read().await;
@@ -62,12 +71,12 @@ pub(crate) async fn delete_file_get(
         return Err(Error::NotFound(query.key));
     }
 
-    Ok(DeletePage {
+    DeletePage {
         server_path: query.server_path,
         key: query.key,
         username: user.username(),
     }
-    .render()?)
+    .into()
 }
 
 pub(crate) async fn delete_file_post(

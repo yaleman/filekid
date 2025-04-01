@@ -8,6 +8,7 @@ pub mod prelude;
 use std::cmp::Ordering;
 use std::path::PathBuf;
 
+use axum::response::{Html, Response};
 use prelude::*;
 
 use crate::oidc::check_login;
@@ -19,10 +20,19 @@ pub(crate) struct HomePage {
     username: String,
 }
 
+impl From<HomePage> for Result<Response, Error>
+where
+    HomePage: Template,
+{
+    fn from(page: HomePage) -> Result<Response, Error> {
+        Ok(Html(page.render()?).into_response())
+    }
+}
+
 pub(crate) async fn home(
     State(state): State<WebState>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<String, Error> {
+) -> Result<Response, Error> {
     let user = check_login(claims)?;
     debug!("User {} logged in", user.username());
 
@@ -36,11 +46,11 @@ pub(crate) async fn home(
         .collect::<Vec<(String, ServerPath)>>();
     server_paths.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-    Ok(HomePage {
+    HomePage {
         server_paths,
         username: user.username(),
     }
-    .render()?)
+    .into()
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -102,7 +112,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_home() {
-        home(
+        let _ = home(
             WebState::test_webstate().await.to_state(),
             Some(test_user_claims()),
         )

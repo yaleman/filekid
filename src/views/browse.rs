@@ -5,7 +5,7 @@ use axum::body::Bytes;
 use axum::extract::{Multipart, Path};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::HeaderMap;
-use axum::response::Redirect;
+use axum::response::{Html, Redirect, Response};
 use tracing::{debug, warn};
 
 use super::{prelude::*, FileType};
@@ -66,6 +66,15 @@ pub(crate) struct BrowsePage {
     username: String,
 }
 
+impl From<BrowsePage> for Result<Response, Error>
+where
+    BrowsePage: Template,
+{
+    fn from(page: BrowsePage) -> Result<Response, Error> {
+        Ok(Html(page.render()?).into_response())
+    }
+}
+
 #[derive(Debug)]
 pub struct FileEntry {
     pub filename: String,
@@ -115,7 +124,7 @@ pub(crate) async fn browse_nopath(
     State(state): State<WebState>,
     Path(server_path): Path<String>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<String, Error> {
+) -> Result<Response, Error> {
     browse(State(state), Path((server_path, None)), claims).await
 }
 
@@ -124,7 +133,7 @@ pub(crate) async fn browse(
     State(state): State<WebState>,
     Path((server_path, filepath)): Path<(String, Option<String>)>,
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
-) -> Result<String, Error> {
+) -> Result<Response, Error> {
     let user = check_login(claims)?;
     debug!("User {} logged in", user.username());
 
@@ -169,14 +178,14 @@ pub(crate) async fn browse(
     // sort by type to put directories first
     entries.sort_by(|a, b| a.filetype.cmp(&b.filetype));
 
-    let res = BrowsePage {
+    BrowsePage {
         server_path,
         entries,
         parent_path,
         current_path: filepath.unwrap_or("".to_string()),
         username: user.username(),
-    };
-    Ok(res.render()?)
+    }
+    .into()
 }
 
 pub(crate) async fn upload_nopath(
