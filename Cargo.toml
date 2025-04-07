@@ -25,7 +25,7 @@ schemars = { version = "0.8.22", features = ["uuid", "url"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 tempfile = "3.19.1"
-tokio = { version = "1.44.1", features = [
+tokio = { version = "1.44.2", features = [
     "time",
     "tokio-macros",
     "tracing",
