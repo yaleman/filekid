@@ -19,7 +19,7 @@ enum-iterator = "2.1.0"
 env_logger = "0.11.8"
 etcetera = "0.10.0"
 futures = "0.3.31"
-log = { version = "0.4.26", features = ["serde"] }
+log = { version = "0.4.27", features = ["serde"] }
 mime_guess = "2.0.5"
 schemars = { version = "0.8.22", features = ["uuid", "url"] }
 serde = { version = "1.0.219", features = ["derive"] }
