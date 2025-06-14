@@ -49,7 +49,7 @@ book:
 
 # Run a local debug instance
 run:
-    cargo run run
+    cargo run
 
 # Run in docker
 run_docker:
@@ -85,7 +85,7 @@ test:
     cargo test
 
 # Things to do before a release
-release_prep: check schema doc semgrep
+release_prep: check doc semgrep
     cargo deny check
     cargo build --release
 
@@ -100,10 +100,6 @@ semgrep:
     --exclude-rule "python.django.security.audit.xss.var-in-script-tag.var-in-script-tag" \
     --exclude-rule "python.flask.security.xss.audit.template-href-var.template-href-var" \
     --exclude-rule "python.flask.security.xss.audit.template-href-var.template-href-var"
-
-# Export the schema
-schema:
-    ./scripts/update_schema.sh
 
 # Build the rustdocs
 doc:

@@ -12,16 +12,18 @@ axum = { version = "0.8.4", features = [
     "http2",
     "tracing",
 ] }
-axum-oidc = "0.6.0"
+# axum-oidc = 0.6.0
+axum-oidc = { git = "https://github.com/pfzetto/axum-oidc", branch = "pfzetto" } # until https://github.com/pfzetto/axum-oidc/pull/23 is merged
 axum-server = { version = "0.7.2", features = ["rustls", "tls-rustls"] }
-clap = { version = "4.5.39", features = ["derive", "env"] }
+clap = { version = "4.5.40", features = ["derive", "env"] }
 enum-iterator = "2.1.0"
 env_logger = "0.11.8"
 etcetera = "0.10.0"
 futures = "0.3.31"
 log = { version = "0.4.27", features = ["serde"] }
 mime_guess = "2.0.5"
-schemars = { version = "0.8.22", features = ["uuid", "url"] }
+rustls = { version = "0.23.27", features = ["aws-lc-rs"] }
+# schemars = { version = "0.9.0", features = ["uuid"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 tempfile = "3.20.0"

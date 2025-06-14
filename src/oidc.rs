@@ -1,7 +1,7 @@
 //! OIDC handling for the web server.
 
 use axum_oidc::{AdditionalClaims, EmptyAdditionalClaims, OidcClaims};
-use tracing::error;
+use tracing::{debug, error, instrument};
 
 use axum_oidc::error::MiddlewareError;
 use tokio::sync::mpsc::Sender;
@@ -21,6 +21,7 @@ impl OidcErrorHandler {
         Self { web_tx }
     }
 
+    #[instrument(level = "debug", skip(self))]
     pub async fn handle_oidc_error(&self, error: &MiddlewareError) {
         if let Some(tx) = &self.web_tx {
             error!(
@@ -47,6 +48,7 @@ impl<AC> From<OidcClaims<AC>> for User
 where
     AC: AdditionalClaims,
 {
+    #[instrument(level = "debug", skip(value))]
     fn from(value: OidcClaims<AC>) -> Self {
         let username = match value.preferred_username() {
             Some(username) => username.as_str().to_string(),
@@ -57,14 +59,18 @@ where
     }
 }
 
+#[instrument(level = "debug", skip(claims))]
 pub(crate) fn check_login(
     claims: Option<OidcClaims<EmptyAdditionalClaims>>,
 ) -> Result<User, Error> {
     match claims {
         Some(user) => Ok(User::from(user)),
-        None => Err(Error::NotAuthorized(
-            "You must be logged in to view this page!".to_string(),
-        )),
+        None => {
+            debug!("User not logged in, redirecting to login page");
+            Err(Error::NotAuthorized(
+                "You must be logged in to view this page!".to_string(),
+            ))
+        }
     }
 }
 
