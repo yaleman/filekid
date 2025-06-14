@@ -6,3 +6,4 @@ files/*
 *.profraw
 .cargo/config.toml
 vendor/
+.DS_Store

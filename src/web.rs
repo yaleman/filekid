@@ -1,6 +1,6 @@
 //! Web UI things
 
-use axum::routing::{get, post};
+use axum::routing::{any, get, post};
 use axum_server::bind_rustls;
 use axum_server::tls_rustls::RustlsConfig;
 use std::path::PathBuf;
@@ -16,7 +16,9 @@ use axum::http::{StatusCode, Uri};
 use axum::response::{IntoResponse, Redirect};
 use axum::Router;
 use axum_oidc::error::MiddlewareError;
-use axum_oidc::{EmptyAdditionalClaims, OidcAuthLayer, OidcLoginLayer};
+use axum_oidc::{
+    handle_oidc_redirect, EmptyAdditionalClaims, OidcAuthLayer, OidcClient, OidcLoginLayer,
+};
 use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
 
@@ -131,41 +133,58 @@ pub(crate) async fn build_app(
         )
         .route(Urls::RpLogout.as_ref(), get(views::oidc::rp_logout));
 
-    let app: Router<WebState> =
-        match state.configuration.read().await.oauth2_disabled {
-            true => app.merge(ui),
-            false => {
-                let oidc_auth_layer = ServiceBuilder::new()
-    .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
-        if let MiddlewareError::SessionNotFound = e {
-            error!("No OIDC session found, redirecting to logout to clear it client-side");
-        } else {
-            oidc_error_handler.handle_oidc_error(&e).await;
-        }
-        Redirect::to(Urls::Logout.as_ref()).into_response()
-    }))
-    .layer(
-        OidcAuthLayer::<EmptyAdditionalClaims>::discover_client(
-            frontend_url,
-            oidc_issuer,
-            oidc_client_id,
-            oidc_client_secret,
-            vec!["openid", "groups"]
-                .into_iter()
-                .map(|s| s.to_string())
-                .collect(),
-        )
-        .await
-        .map_err(|err| {
-            error!("Failed to set up OIDC: {:?}", err);
-            Error::from(err)
-        })?,
-    );
-                app.merge(ui)
-                    .layer(oidc_login_service)
-                    .layer(oidc_auth_layer)
+    let app: Router<WebState> = match state.configuration.read().await.oauth2_disabled {
+        true => app.merge(ui),
+        false => {
+            let tail = match frontend_url.path().ends_with("/") {
+                true => "",
+                false => "/",
+            };
+            let redirect_url = format!("{}{}{}", frontend_url, tail, "auth/login")
+                .parse::<Uri>()
+                .map_err(|err| {
+                    Error::Configuration(format!("Failed to parse frontend URL: {:?}", err))
+                })?;
+
+            let mut oidc_client = OidcClient::builder()
+                .with_default_http_client()
+                .add_scope("openid")
+                .add_scope("groups")
+                .with_redirect_url(redirect_url)
+                .with_client_id(oidc_client_id);
+
+            if let Some(secret) = oidc_client_secret {
+                oidc_client = oidc_client.with_client_secret(secret);
             }
-        };
+
+            let oidc_client: OidcClient<EmptyAdditionalClaims> =
+                oidc_client.discover(oidc_issuer).await?.build();
+
+            let oidc_auth_layer: OidcAuthLayer<EmptyAdditionalClaims> =
+                OidcAuthLayer::<EmptyAdditionalClaims>::new(oidc_client);
+
+            let oidc_auth_service = ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|e: MiddlewareError| async move {
+                    if let MiddlewareError::SessionNotFound = e {
+                        error!(
+                            "No OIDC session found, redirecting to logout to clear it client-side"
+                        );
+                    } else {
+                        oidc_error_handler.handle_oidc_error(&e).await;
+                    }
+                    Redirect::to(Urls::Logout.as_ref()).into_response()
+                }))
+                .layer(oidc_auth_layer);
+
+            app.merge(ui)
+                .layer(oidc_login_service)
+                .route(
+                    "/auth/login",
+                    any(handle_oidc_redirect::<EmptyAdditionalClaims>),
+                )
+                .layer(oidc_auth_service)
+        }
+    };
     // after here, the routers don't *require* auth
     let app = app
         // after here, the URLs cannot have auth
@@ -247,6 +266,8 @@ pub async fn run_web_server(
     mut web_server_controller: Receiver<WebServerControl>,
 ) -> Result<(), Error> {
     let (_deletion_task, session_layer) = crate::session_store::build(None).await?;
+
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     let app = build_app(
         // TODO web_tx impl
