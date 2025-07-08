@@ -79,8 +79,8 @@ impl IntoResponse for Error {
             }
             .render()
             .map_err(|error| {
-                log::error!("Error rendering error page: {}", error);
-                Error::InternalServerError(format!("Error rendering error page: {}", error))
+                log::error!("Error rendering error page: {error}");
+                Error::InternalServerError(format!("Error rendering error page: {error}"))
             }),
         )
             .into_response()
@@ -90,17 +90,17 @@ impl IntoResponse for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Generic(e) => write!(f, "Generic error: {}", e),
-            Error::Configuration(e) => write!(f, "Configuration error: {}", e),
-            Error::Oidc(e) => write!(f, "OIDC error: {}", e),
-            Error::NotFound(e) => write!(f, "File/directory not found: {}", e),
-            Error::InternalServerError(e) => write!(f, "Internal server error: {}", e),
-            Error::Io(e) => write!(f, "IO error: {}", e),
-            Error::NotAuthorized(e) => write!(f, "Not authorized: {}", e),
-            Error::InvalidFileType(e) => write!(f, "Invalid file type: {}", e),
-            Error::BadRequest(e) => write!(f, "Bad request: {}", e),
-            Error::TemplateRendering(e) => write!(f, "Template rendering error: {}", e),
-            Error::Database(e) => write!(f, "Database error: {}", e),
+            Error::Generic(e) => write!(f, "Generic error: {e}"),
+            Error::Configuration(e) => write!(f, "Configuration error: {e}"),
+            Error::Oidc(e) => write!(f, "OIDC error: {e}"),
+            Error::NotFound(e) => write!(f, "File/directory not found: {e}"),
+            Error::InternalServerError(e) => write!(f, "Internal server error: {e}"),
+            Error::Io(e) => write!(f, "IO error: {e}"),
+            Error::NotAuthorized(e) => write!(f, "Not authorized: {e}"),
+            Error::InvalidFileType(e) => write!(f, "Invalid file type: {e}"),
+            Error::BadRequest(e) => write!(f, "Bad request: {e}"),
+            Error::TemplateRendering(e) => write!(f, "Template rendering error: {e}"),
+            Error::Database(e) => write!(f, "Database error: {e}"),
         }
     }
 }

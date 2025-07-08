@@ -21,8 +21,7 @@ async fn db_dir() -> Result<String, Error> {
     })
     .map_err(|err| {
         Error::Configuration(format!(
-            "Couldn't identify way of generating a database dir! Error was: {}",
-            err
+            "Couldn't identify way of generating a database dir! Error was: {err}"
         ))
     })?;
 

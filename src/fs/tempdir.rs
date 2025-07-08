@@ -87,8 +87,7 @@ impl FileKidFs for TempDir {
     async fn get_file(&self, filepath: &str) -> Result<Vec<u8>, Error> {
         if !self.is_in_basepath(filepath)? {
             return Err(Error::NotAuthorized(format!(
-                "Path '{}' is outside of base path",
-                &filepath
+                "Path '{filepath}' is outside of base path"
             )));
         }
 
@@ -109,8 +108,7 @@ impl FileKidFs for TempDir {
             Ok(())
         } else {
             Err(crate::error::Error::NotAuthorized(format!(
-                "Path {} is outside of parent path",
-                filepath
+                "Path {filepath} is outside of parent path"
             )))
         }
     }
@@ -130,8 +128,7 @@ impl FileKidFs for TempDir {
         let target_path = self.0.join(&path_addition);
         if !target_path.is_dir() {
             return Err(Error::BadRequest(format!(
-                "{} is not a directory",
-                path_addition
+                "{path_addition} is not a directory"
             )));
         }
 
@@ -142,7 +139,7 @@ impl FileKidFs for TempDir {
             for direntry in readdir {
                 let direntry = direntry.map_err(Error::from)?;
                 let mut fileentry = FileEntry::try_from(direntry)?;
-                fileentry.fullpath = format!("{}/{}", path_addition, fileentry.filename)
+                fileentry.fullpath = format!("{path_addition}/{}", fileentry.filename)
                     .trim_start_matches("/")
                     .to_string();
                 res.push(fileentry);

@@ -65,7 +65,7 @@ impl FileKidFs for LocalFs {
         self.is_in_basepath(&path.into())?;
 
         if !self.base_path.join(path).exists() {
-            return Err(Error::NotFound(format!("Can't find {}", path)));
+            return Err(Error::NotFound(format!("Can't find {path}")));
         }
 
         let actual_filepath = self.base_path.join(path);
@@ -149,8 +149,7 @@ impl FileKidFs for LocalFs {
 
         if !target_path.is_dir() {
             return Err(Error::BadRequest(format!(
-                "{} is not a directory",
-                path_addition
+                "{path_addition} is not a directory"
             )));
         }
 
@@ -184,12 +183,11 @@ impl FileKidFs for LocalFs {
                                 e
                             );
                             Error::InternalServerError(format!(
-                                "Invalid Filename {:?} {:?}",
-                                entry, e
+                                "Invalid Filename {entry:?} {e:?}"
                             ))
                         })?;
                         let fullpath = match &path {
-                            Some(p) => format!("{}/{}", p, filename),
+                            Some(p) => format!("{p}/{filename}"),
                             None => filename.clone(),
                         };
 
