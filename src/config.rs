@@ -109,7 +109,7 @@ impl Config {
             ))
         })?;
         serde_json::from_str(&config).map_err(|e| {
-            eprintln!("Failed to parse config as JSONj: {}", e);
+            eprintln!("Failed to parse config as JSONj: {e}");
             Error::Configuration(e.to_string())
         })
     }
@@ -124,8 +124,7 @@ impl Config {
                     let filekid: Box<dyn FileKidFs> = fs::fs_from_serverpath(server_config)?;
                     if !filekid.available()? {
                         return Err(Error::NotFound(format!(
-                            "Server path {} ({:?}) is not online",
-                            server, filekid,
+                            "Server path {server} ({filekid:?}) is not online"
                         )));
                     }
                 }

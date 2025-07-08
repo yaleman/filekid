@@ -83,7 +83,7 @@ pub(crate) async fn build_app(
     drop(config_reader);
 
     let frontend_url = Uri::from_str(&frontend_url)
-        .map_err(|err| Error::Configuration(format!("Failed to parse base_url: {:?}", err)))?;
+        .map_err(|err| Error::Configuration(format!("Failed to parse base_url: {err:?}")))?;
     debug!("Frontend URL: {:?}", frontend_url);
     let oidc_error_handler = OidcErrorHandler::new(Some(state.web_tx.clone()));
 
@@ -143,7 +143,7 @@ pub(crate) async fn build_app(
             let redirect_url = format!("{}{}{}", frontend_url, tail, "auth/login")
                 .parse::<Uri>()
                 .map_err(|err| {
-                    Error::Configuration(format!("Failed to parse frontend URL: {:?}", err))
+                    Error::Configuration(format!("Failed to parse frontend URL: {err:?}"))
                 })?;
 
             let mut oidc_client = OidcClient::builder()
@@ -217,15 +217,13 @@ fn check_certs_exist(
     let cert_key = config_reader.cert_key.clone();
     if !cert_file.exists() {
         return Err(Error::Generic(format!(
-            "TLS is enabled but cert_file {:?} does not exist",
-            cert_file
+            "TLS is enabled but cert_file {cert_file:?} does not exist"
         )));
     }
 
     if !cert_key.exists() {
         return Err(Error::Generic(format!(
-            "TLS is enabled but cert_key {:?} does not exist",
-            cert_key
+            "TLS is enabled but cert_key {cert_key:?} does not exist"
         )));
     };
     Ok((cert_file, cert_key))
@@ -241,19 +239,18 @@ pub async fn start_web_server(configuration: SendableConfig, app: Router) -> Res
 
     let tls_config = RustlsConfig::from_pem_file(&cert_file.as_path(), &cert_key.as_path())
         .await
-        .map_err(|err| Error::Generic(format!("Failed to load TLS config: {:?}", err)))?;
+        .map_err(|err| Error::Generic(format!("Failed to load TLS config: {err:?}")))?;
     bind_rustls(
         listen_address.parse().map_err(|err| {
             Error::Generic(format!(
-                "Failed to parse listen address {}: {:?}",
-                listen_address, err
+                "Failed to parse listen address {listen_address}: {err:?}"
             ))
         })?,
         tls_config,
     )
     .serve(app.into_make_service())
     .await
-    .map_err(|err| Error::Generic(format!("Web server failed: {:?}", err)))
+    .map_err(|err| Error::Generic(format!("Web server failed: {err:?}")))
 }
 
 /// Starts up the web server

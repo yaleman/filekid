@@ -59,7 +59,7 @@ where
         if filepath.trim().strip_prefix('/').unwrap_or("").is_empty() {
             Ok(filename.to_string())
         } else {
-            Ok(format!("{}/{}", filepath, filename))
+            Ok(format!("{filepath}/{filename}"))
         }
     }
     fn target_path_from_key(&self, key: &str) -> PathBuf;
