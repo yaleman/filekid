@@ -22,7 +22,7 @@ etcetera = "0.10.0"
 futures = "0.3.31"
 log = { version = "0.4.27", features = ["serde"] }
 mime_guess = "2.0.5"
-rustls = { version = "0.23.30", features = ["aws-lc-rs"] }
+rustls = { version = "0.23.31", features = ["aws-lc-rs"] }
 # schemars = { version = "0.9.0", features = ["uuid"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
