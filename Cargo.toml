@@ -41,7 +41,7 @@ tower-sessions = "0.14.0"
 tower-sessions-sqlx-store = { version = "0.15.0", features = [
     "sqlite",
 ], default-features = false }
-tracing = "0.1.41"
+tracing = "0.1.43"
 
 [dev-dependencies]
 chrono = "0.4.42"
