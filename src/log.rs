@@ -7,12 +7,6 @@ use log::LevelFilter;
 
 /// Sets up logging
 pub fn setup_logging(debug: bool, db_debug: bool) -> Result<(), log::SetLoggerError> {
-    // check the env vars
-    #[cfg(not(any(debug_assertions, test)))]
-    if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info");
-    }
-
     let mut builder = Builder::from_default_env();
 
     let level = if debug && env::var("RUST_LOG").is_err() {
