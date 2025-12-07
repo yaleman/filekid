@@ -3,6 +3,7 @@
 use axum::routing::{any, get, post};
 use axum_server::bind_rustls;
 use axum_server::tls_rustls::RustlsConfig;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -241,7 +242,7 @@ pub async fn start_web_server(configuration: SendableConfig, app: Router) -> Res
         .await
         .map_err(|err| Error::Generic(format!("Failed to load TLS config: {err:?}")))?;
     bind_rustls(
-        listen_address.parse().map_err(|err| {
+        listen_address.parse::<SocketAddr>().map_err(|err| {
             Error::Generic(format!(
                 "Failed to parse listen address {listen_address}: {err:?}"
             ))
