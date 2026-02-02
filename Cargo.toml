@@ -4,7 +4,7 @@ version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-askama = { version = "0.15.1" }
+askama = { version = "0.15.4" }
 async-trait = "0.1.89"
 axum = { version = "0.8.8", features = [
     "macros",
