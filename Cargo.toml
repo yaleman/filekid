@@ -17,7 +17,7 @@ axum-oidc = { git = "https://github.com/pfzetto/axum-oidc", branch = "pfzetto" }
 axum-server = { version = "0.8.0", features = ["rustls", "tls-rustls"] }
 clap = { version = "4.5.58", features = ["derive", "env"] }
 enum-iterator = "2.3.0"
-env_logger = "0.11.8"
+env_logger = "0.11.9"
 etcetera = "0.11.0"
 futures = "0.3.31"
 log = { version = "0.4.29", features = ["serde"] }
