@@ -15,7 +15,7 @@ axum = { version = "0.8.8", features = [
 # axum-oidc = 0.6.0
 axum-oidc = { git = "https://github.com/pfzetto/axum-oidc", branch = "pfzetto" } # until https://github.com/pfzetto/axum-oidc/pull/23 is merged
 axum-server = { version = "0.8.0", features = ["rustls", "tls-rustls"] }
-clap = { version = "4.5.57", features = ["derive", "env"] }
+clap = { version = "4.5.58", features = ["derive", "env"] }
 enum-iterator = "2.3.0"
 env_logger = "0.11.8"
 etcetera = "0.11.0"
