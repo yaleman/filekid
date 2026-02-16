@@ -19,7 +19,7 @@ clap = { version = "4.5.58", features = ["derive", "env"] }
 enum-iterator = "2.3.0"
 env_logger = "0.11.8"
 etcetera = "0.11.0"
-futures = "0.3.31"
+futures = "0.3.32"
 log = { version = "0.4.29", features = ["serde"] }
 mime_guess = "2.0.5"
 rustls = { version = "0.23.36", features = ["aws-lc-rs"] }
