@@ -37,6 +37,7 @@ async fn main() -> Result<(), filekid::error::Error> {
     run_web_server(
         PathBuf::from_str("filekid.json").expect("Failed to parse filekid.json"),
         sendable_config,
+        cli.session_db_path.map(|p| format!("sqlite://{}?mode=rwc", p.display())),
         web_tx,
         web_rx,
     )
