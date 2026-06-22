@@ -25,6 +25,9 @@ pub struct CliOpts {
 
     #[clap(long, env = "FILEKID_DB_DEBUG")]
     pub db_debug: bool,
+
+    #[clap(long, env = "FILEKID_SESSION_DB_PATH")]
+    pub session_db_path: Option<PathBuf>,
 }
 
 impl CliOpts {
@@ -46,6 +49,7 @@ impl Default for CliOpts {
             #[cfg(any(debug_assertions, test))]
             oauth2_disable: false,
             db_debug: false,
+            session_db_path: None,
             bind_address: DEFAULT_BIND_ADDRESS
                 .parse()
                 .expect("Failed to parse ::1 as an IP address!"),

@@ -258,12 +258,13 @@ pub async fn start_web_server(configuration: SendableConfig, app: Router) -> Res
 pub async fn run_web_server(
     config_filepath: PathBuf,
     configuration: SendableConfig,
+    session_db_path: Option<String>,
     // db: Arc<DatabaseConnection>,
     // registry: Arc<Registry>,
     web_tx: Sender<WebServerControl>,
     mut web_server_controller: Receiver<WebServerControl>,
 ) -> Result<(), Error> {
-    let (_deletion_task, session_layer) = crate::session_store::build(None).await?;
+    let (_deletion_task, session_layer) = crate::session_store::build(session_db_path).await?;
 
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
@@ -340,7 +341,7 @@ mod tests {
 
         let server_tx = web_tx.clone();
         let server = tokio::spawn(async move {
-            run_web_server(config_filepath, configuration, server_tx, web_rx).await
+            run_web_server(config_filepath, configuration, None, server_tx, web_rx).await
         });
 
         web_tx
