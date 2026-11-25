@@ -15,9 +15,8 @@ axum = { version = "0.8.9", features = [
 # axum-oidc = 0.6.0
 axum-oidc = { git = "https://github.com/pfzetto/axum-oidc", branch = "pfzetto" } # until https://github.com/pfzetto/axum-oidc/pull/23 is merged
 axum-server = { version = "0.8.0", features = ["rustls", "tls-rustls"] }
-clap = { version = "4.6.1", features = ["derive", "env"] }
-enum-iterator = "2.3.0"
-env_logger = "0.11.10"
+clap = { version = "4.6.10", features = ["derive", "env"] }
+env_logger = "0.11.12"
 etcetera = "0.11.0"
 futures = "0.3.32"
 log = { version = "0.4.33", features = ["serde"] }
@@ -36,9 +35,9 @@ tokio = { version = "1.52.3", features = [
 ] }
 tokio-util = "0.7.18"
 tower = "0.5.3"
-tower-http = { version = "0.7.0", features = ["fs", "limit"] }
-tower-sessions = "0.14.0"
-tower-sessions-sqlx-store = { version = "0.15.0", features = [
+tower-http = { version = "0.7.1", features = ["fs", "limit"] }
+tower-sessions = "0.15.0"
+tower-sessions-sqlx-store = { version = "0.16.0", features = [
     "sqlite",
 ], default-features = false }
 tracing = "0.1.44"
